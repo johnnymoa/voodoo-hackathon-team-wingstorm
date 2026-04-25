@@ -3,12 +3,18 @@
 The merged pipeline. Single input → market intelligence + brief + Scenario poster
 + a market-informed playable HTML + market-hypothesis variants.
 
-Inputs:
-  - target_term         (a game name)
-  - video_path          (gameplay video for the same game)
+Layout on disk:
 
-Outputs everything both pipelines produce, plus a playable that bakes the
-top-ranked market hook/palette/CTA into its CONFIG and intro screen.
+    runs/<full_run_id>/
+      manifest.json              ← top-level, lists children
+      creative/                  ← creative_forge child run, full creative_forge layout
+        manifest.json
+        brief.md
+        ...
+      playable/                  ← playable_forge child run, full playable_forge layout
+        manifest.json
+        playable.html
+        ...
 
 Use this when you want both pipelines bundled into one demo. For single-pipeline
 runs, prefer playable_forge or creative_forge directly.
@@ -16,21 +22,24 @@ runs, prefer playable_forge or creative_forge directly.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from pydantic import BaseModel
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
+    from adforge.activities.finalize import FinalizeRunInput, FinalizeRunResult
     from adforge.activities.types import VariationSpec
     from adforge.pipelines.creative_forge import CreativeForgeInput, CreativeForgeResult
     from adforge.pipelines.playable_forge import PlayableForgeInput, PlayableForgeResult
 
 
 class FullForgeInput(BaseModel):
-    target_term: str                      # e.g. "castle clasher"
-    video_path: str                       # e.g. videos/castle_clasher.mp4
-    out_dir: str                          # e.g. output/full/<run_id>/
+    target_id: str
+    run_id: str
+    run_dir: str
+    target_term: str                      # display name / search term
+    video_path: str
     asset_dir: str | None = None
     category: str | int = 7012
     country: str = "US"
@@ -42,8 +51,10 @@ class FullForgeInput(BaseModel):
 
 
 class FullForgeResult(BaseModel):
+    run_id: str
     creative: CreativeForgeResult
     playable: PlayableForgeResult
+    manifest_path: str
 
 
 def _hypothesis_variants(patterns_dump: dict) -> list[VariationSpec]:
@@ -83,11 +94,18 @@ def _hypothesis_variants(patterns_dump: dict) -> list[VariationSpec]:
 class FullForge:
     @workflow.run
     async def run(self, inp: FullForgeInput) -> FullForgeResult:
+        started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+        creative_run_id = f"{inp.run_id}__creative"
+        playable_run_id = f"{inp.run_id}__playable"
+
         creative: CreativeForgeResult = await workflow.execute_child_workflow(
             "creative_forge",
             CreativeForgeInput(
+                target_id=inp.target_id,
+                run_id=creative_run_id,
+                run_dir=f"{inp.run_dir}/creative",
                 target_term=inp.target_term,
-                out_dir=f"{inp.out_dir}/creative",
                 category=inp.category,
                 country=inp.country,
                 network=inp.network,
@@ -96,7 +114,7 @@ class FullForge:
                 render_with_scenario_http=inp.render_with_scenario_http,
                 num_images=inp.num_images,
             ),
-            id=f"creative-{inp.target_term}",
+            id=creative_run_id,
             execution_timeout=timedelta(hours=1),
         )
 
@@ -105,15 +123,35 @@ class FullForge:
         playable: PlayableForgeResult = await workflow.execute_child_workflow(
             "playable_forge",
             PlayableForgeInput(
+                target_id=inp.target_id,
+                run_id=playable_run_id,
+                run_dir=f"{inp.run_dir}/playable",
                 video_path=inp.video_path,
-                out_dir=f"{inp.out_dir}/playable",
                 base_filename="playable.html",
                 asset_dir=inp.asset_dir,
                 market_patterns=creative.patterns.model_dump(),
                 variants=variants,
             ),
-            id=f"playable-{inp.target_term}",
+            id=playable_run_id,
             execution_timeout=timedelta(hours=1),
         )
 
-        return FullForgeResult(creative=creative, playable=playable)
+        finalized: FinalizeRunResult = await workflow.execute_activity(
+            "finalize_run",
+            FinalizeRunInput(
+                run_dir=inp.run_dir,
+                run_id=inp.run_id,
+                pipeline="full_forge",
+                target_id=inp.target_id,
+                started_at=started_at,
+                params=inp.model_dump(),
+                artifact_globs=["**/*.html", "**/*.json", "**/*.md", "**/*.txt", "**/*.png"],
+                children=[creative_run_id, playable_run_id],
+            ),
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+
+        return FullForgeResult(
+            run_id=inp.run_id, creative=creative, playable=playable,
+            manifest_path=finalized.manifest_path,
+        )

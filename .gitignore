@@ -50,21 +50,18 @@ Thumbs.db
 .claude/.credentials/
 .claude/projects/
 
-# Hackathon outputs (large/generated; keep selectively)
-videos/*.mp4
-videos/*.mov
-videos/*.webm
-videos/*.gif
-!videos/.gitkeep
+# targets/ — gameplay videos are large; commit metadata + assets, never videos
+targets/**/video.mp4
+targets/**/video.mov
+targets/**/video.webm
+targets/**/video.gif
+targets/**/raw/
+targets/**/scenario_downloads/
 
-assets/raw/
-assets/scenario_downloads/
-output/cache/
-output/tmp/
-
-# Large generated playables (commit final ones explicitly)
-output/playables/*.bak.html
-output/creatives/*.tmp.*
+# runs/ — every pipeline execution. Keep the dir, drop the contents.
+runs/*
+!runs/.gitkeep
+!runs/README.md
 
 # Logs
 *.log

@@ -8,19 +8,21 @@ Steps:
   5. (optional) render_scenario_creative — headless image gen via Scenario HTTP API
                               (skipped by default — preferred path is the Scenario MCP
                               inside Claude Code)
+  6. finalize_run            — write manifest.json
 
 Input: CreativeForgeInput. Output: CreativeForgeResult.
 """
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from pydantic import BaseModel
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
+    from adforge.activities.finalize import FinalizeRunInput, FinalizeRunResult
     from adforge.activities.types import (
         BriefInput,
         BriefResult,
@@ -36,8 +38,10 @@ with workflow.unsafe.imports_passed_through():
 
 
 class CreativeForgeInput(BaseModel):
-    target_term: str
-    out_dir: str
+    target_id: str                       # for manifest provenance
+    run_id: str
+    run_dir: str                         # absolute path to runs/<run_id>/
+    target_term: str                     # display name / search term, e.g. "Castle Clashers"
     category: str | int = 7012
     country: str = "US"
     network: str = "TikTok"
@@ -48,10 +52,12 @@ class CreativeForgeInput(BaseModel):
 
 
 class CreativeForgeResult(BaseModel):
+    run_id: str
     target: TargetGame
     patterns: Patterns
     brief: BriefResult
     images: ScenarioRenderResult | None = None
+    manifest_path: str
 
 
 _RETRY = RetryPolicy(initial_interval=timedelta(seconds=2), maximum_attempts=4)
@@ -61,6 +67,8 @@ _RETRY = RetryPolicy(initial_interval=timedelta(seconds=2), maximum_attempts=4)
 class CreativeForge:
     @workflow.run
     async def run(self, inp: CreativeForgeInput) -> CreativeForgeResult:
+        started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
         target: TargetGame = await workflow.execute_activity(
             "resolve_target_game",
             TargetGameInput(term=inp.target_term),
@@ -89,28 +97,28 @@ class CreativeForge:
 
         await workflow.execute_activity(
             "write_json",
-            {"path": f"{inp.out_dir}/target.json",            "data": target.model_dump()},
+            {"path": f"{inp.run_dir}/target.json",            "data": target.model_dump()},
             start_to_close_timeout=timedelta(seconds=15),
         )
         await workflow.execute_activity(
             "write_json",
-            {"path": f"{inp.out_dir}/top_advertisers.json",   "data": market.top_advertisers},
+            {"path": f"{inp.run_dir}/top_advertisers.json",   "data": market.top_advertisers},
             start_to_close_timeout=timedelta(seconds=30),
         )
         await workflow.execute_activity(
             "write_json",
-            {"path": f"{inp.out_dir}/top_creatives.json",     "data": market.top_creatives},
+            {"path": f"{inp.run_dir}/top_creatives.json",     "data": market.top_creatives},
             start_to_close_timeout=timedelta(seconds=30),
         )
         await workflow.execute_activity(
             "write_json",
-            {"path": f"{inp.out_dir}/patterns.json",          "data": patterns.model_dump()},
+            {"path": f"{inp.run_dir}/patterns.json",          "data": patterns.model_dump()},
             start_to_close_timeout=timedelta(seconds=30),
         )
 
         brief: BriefResult = await workflow.execute_activity(
             "write_brief_and_prompt",
-            BriefInput(target=target, patterns=patterns, out_dir=inp.out_dir),
+            BriefInput(target=target, patterns=patterns, out_dir=inp.run_dir),
             start_to_close_timeout=timedelta(seconds=30),
             retry_policy=_RETRY,
         )
@@ -121,7 +129,7 @@ class CreativeForge:
                 "render_scenario_creative",
                 ScenarioRenderInput(
                     prompt_path=brief.scenario_prompt_path,
-                    out_dir=inp.out_dir,
+                    out_dir=inp.run_dir,
                     num_images=inp.num_images,
                 ),
                 start_to_close_timeout=timedelta(minutes=5),
@@ -129,6 +137,21 @@ class CreativeForge:
                 heartbeat_timeout=timedelta(seconds=60),
             )
 
+        finalized: FinalizeRunResult = await workflow.execute_activity(
+            "finalize_run",
+            FinalizeRunInput(
+                run_dir=inp.run_dir,
+                run_id=inp.run_id,
+                pipeline="creative_forge",
+                target_id=inp.target_id,
+                started_at=started_at,
+                params=inp.model_dump(),
+                artifact_globs=["*.json", "*.md", "*.txt", "*.png", "*.jpg"],
+            ),
+            start_to_close_timeout=timedelta(seconds=15),
+        )
+
         return CreativeForgeResult(
-            target=target, patterns=patterns, brief=brief, images=images,
+            run_id=inp.run_id, target=target, patterns=patterns,
+            brief=brief, images=images, manifest_path=finalized.manifest_path,
         )

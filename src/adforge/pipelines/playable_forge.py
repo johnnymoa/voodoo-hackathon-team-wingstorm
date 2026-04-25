@@ -6,13 +6,14 @@ Steps:
   3. build_playable_html      — inject CONFIG into the template
   4. inline_html_assets       — collapse external refs, verify size
   5. generate_variations      — emit N variants by overriding CONFIG
+  6. finalize_run             — write manifest.json
 
 Input: PlayableForgeInput. Output: PlayableForgeResult.
 """
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from pydantic import BaseModel
@@ -20,6 +21,7 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
+    from adforge.activities.finalize import FinalizeRunInput, FinalizeRunResult
     from adforge.activities.types import (
         GameAnalysis,
         PlayableBuildInput,
@@ -32,8 +34,10 @@ with workflow.unsafe.imports_passed_through():
 
 
 class PlayableForgeInput(BaseModel):
+    target_id: str                        # for manifest provenance
+    run_id: str
+    run_dir: str                          # absolute path to runs/<run_id>/
     video_path: str
-    out_dir: str                          # e.g. output/playables/<run_id>/
     base_filename: str = "playable.html"
     asset_dir: str | None = None
     market_patterns: dict[str, Any] | None = None    # from creative_forge
@@ -41,9 +45,11 @@ class PlayableForgeInput(BaseModel):
 
 
 class PlayableForgeResult(BaseModel):
+    run_id: str
     analysis: GameAnalysis
     base_playable: PlayableBuildResult
     variations: VariationsResult
+    manifest_path: str
 
 
 _RETRY = RetryPolicy(initial_interval=timedelta(seconds=2), maximum_attempts=4)
@@ -53,6 +59,8 @@ _RETRY = RetryPolicy(initial_interval=timedelta(seconds=2), maximum_attempts=4)
 class PlayableForge:
     @workflow.run
     async def run(self, inp: PlayableForgeInput) -> PlayableForgeResult:
+        started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
         analysis: GameAnalysis = await workflow.execute_activity(
             "analyze_gameplay_video",
             VideoAnalysisInput(video_path=inp.video_path),
@@ -61,7 +69,7 @@ class PlayableForge:
             heartbeat_timeout=timedelta(seconds=30),
         )
 
-        base_path = f"{inp.out_dir}/{inp.base_filename}"
+        base_path = f"{inp.run_dir}/{inp.base_filename}"
         base: PlayableBuildResult = await workflow.execute_activity(
             "build_playable_html",
             PlayableBuildInput(
@@ -87,12 +95,30 @@ class PlayableForge:
             VariationsInput(
                 base_html_path=base.html_path,
                 variants=inp.variants,
-                out_dir=inp.out_dir,
+                out_dir=inp.run_dir,
             ),
             start_to_close_timeout=timedelta(minutes=1),
             retry_policy=_RETRY,
         )
 
+        finalized: FinalizeRunResult = await workflow.execute_activity(
+            "finalize_run",
+            FinalizeRunInput(
+                run_dir=inp.run_dir,
+                run_id=inp.run_id,
+                pipeline="playable_forge",
+                target_id=inp.target_id,
+                started_at=started_at,
+                params=inp.model_dump(exclude={"market_patterns"}),
+                artifact_globs=["*.html", "*.json", "*.md"],
+            ),
+            start_to_close_timeout=timedelta(seconds=15),
+        )
+
         return PlayableForgeResult(
-            analysis=analysis, base_playable=base, variations=variations
+            run_id=inp.run_id,
+            analysis=analysis,
+            base_playable=base,
+            variations=variations,
+            manifest_path=finalized.manifest_path,
         )

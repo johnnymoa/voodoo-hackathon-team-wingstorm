@@ -1,4 +1,14 @@
-"""Project config — loads .env once and exposes typed access."""
+"""Project config — loads .env once and exposes typed access.
+
+The four top-level data buckets at the repo root, mapped to constants:
+
+    targets/       TARGETS_DIR     pipeline inputs (one folder per game)
+    runs/          RUNS_DIR        pipeline outputs (one folder per execution)
+    reference/     REFERENCE_DIR   canonical example playables, study material
+    .cache/        CACHE_DIR       SensorTower API cache (never read by pipelines)
+
+Code never hard-codes these paths — always import from here.
+"""
 
 from __future__ import annotations
 
@@ -9,10 +19,30 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-OUTPUT_DIR = REPO_ROOT / "output"
-ASSETS_DIR = REPO_ROOT / "assets"
-VIDEOS_DIR = REPO_ROOT / "videos"
+def _repo_root() -> Path:
+    """Project root for resolving targets/, runs/, reference/.
+
+    Order:
+      1. ADFORGE_ROOT env var (explicit override).
+      2. Walk up from cwd looking for a marker (pyproject.toml + targets/ or runs/).
+      3. Fall back to cwd.
+
+    This works in both editable and wheel installs — file-relative paths can't,
+    because under a wheel install __file__ lives in site-packages.
+    """
+    if env := os.environ.get("ADFORGE_ROOT"):
+        return Path(env).expanduser().resolve()
+    here = Path.cwd()
+    for cand in [here, *here.parents]:
+        if (cand / "pyproject.toml").is_file() and (cand / "src" / "adforge").is_dir():
+            return cand
+    return here
+
+
+REPO_ROOT = _repo_root()
+TARGETS_DIR = REPO_ROOT / "targets"
+RUNS_DIR = REPO_ROOT / "runs"
+REFERENCE_DIR = REPO_ROOT / "reference"
 CACHE_DIR = REPO_ROOT / ".cache"
 
 
@@ -67,11 +97,5 @@ def settings() -> Settings:
 
 
 def ensure_dirs() -> None:
-    for d in (
-        OUTPUT_DIR,
-        OUTPUT_DIR / "playables",
-        OUTPUT_DIR / "creatives",
-        OUTPUT_DIR / "full",
-        CACHE_DIR,
-    ):
+    for d in (TARGETS_DIR, RUNS_DIR, REFERENCE_DIR, CACHE_DIR):
         d.mkdir(parents=True, exist_ok=True)
