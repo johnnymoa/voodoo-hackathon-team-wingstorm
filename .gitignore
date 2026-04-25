@@ -63,6 +63,10 @@ runs/*
 !runs/.gitkeep
 !runs/README.md
 
+# UI build output (Vite)
+ui/dist/
+ui/.vite/
+
 # Logs
 *.log
 logs/

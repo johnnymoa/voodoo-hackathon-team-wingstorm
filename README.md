@@ -37,7 +37,10 @@ adforge/
 │   ├── pipelines/             workflows: creative_forge, playable_forge, full_forge
 │   ├── templates/             playable_template.html
 │   ├── worker.py              Temporal worker entrypoint
-│   └── cli.py                 `adforge` CLI surface
+│   ├── api.py                 FastAPI shim that powers the UI
+│   └── cli.py                 `adforge` CLI surface (worker / run / api / tools)
+│
+├── ui/                        ← VIEWER. Vite + React + Tailwind. Reads runs/ via api.py.
 │
 ├── docs/                      design notes, briefs, API reference
 ├── .env / .env.example        secrets
@@ -80,6 +83,23 @@ uv run adforge run full     --target castle_clashers
 
 The Temporal Web UI at <http://localhost:8233> shows every activity, retry, and timing.
 The artifacts land in `runs/<run_id>/`.
+
+## Browse runs in the UI
+
+A read-only Vite/React viewer lives at `ui/`. It reads `runs/` and `targets/`
+via the FastAPI shim in `src/adforge/api.py` and embeds playables in iframes,
+renders briefs as markdown, and links each run to its Temporal workflow page.
+
+```bash
+# terminal 4 — FastAPI shim (reads runs/ + targets/)
+uv run adforge api                 # http://127.0.0.1:8765
+
+# terminal 5 — Vite dev server (proxies /api → 8765)
+cd ui && npm install && npm run dev   # http://localhost:5173
+```
+
+Three views: `/runs` (engineering log of every execution), `/runs/:id` (manifest
++ artifact viewer), `/targets` (input bundles, with copy-paste run commands).
 
 ## Adding a new target
 

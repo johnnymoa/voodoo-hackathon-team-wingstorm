@@ -44,6 +44,18 @@ def worker() -> None:
     worker_mod.main()
 
 
+@app.command()
+def api(
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8765, "--port"),
+    reload: bool = typer.Option(False, "--reload", help="Auto-reload on code change (dev)"),
+) -> None:
+    """Run the FastAPI shim that powers the ui/ viewer."""
+    import uvicorn
+
+    uvicorn.run("adforge.api:app", host=host, port=port, reload=reload)
+
+
 # ───── workflow launchers ────────────────────────────────────────────────
 
 
