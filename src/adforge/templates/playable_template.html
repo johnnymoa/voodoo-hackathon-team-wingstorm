@@ -1,0 +1,171 @@
+<!doctype html>
+<!--
+  AdForge — playable template
+  ────────────────────────────────
+  Single-file HTML playable scaffold. Touch-first, mobile-friendly, no external deps.
+  The CONFIG block below is REWRITTEN by `build_playable_html` activity at run time.
+  Replace the GAME section with your loop. Keep CONFIG contiguous.
+
+  Network hooks (mraid / FbPlayableAd / ExitApi / gameStart-End) are no-ops if not
+  injected by the network. Final inlined file should stay ≤ 5 MB.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>Castle Clasher — Playable</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0a0a14; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+    #stage { position: fixed; inset: 0; display: block; }
+    #ui { position: fixed; inset: 0; pointer-events: none; }
+    #ui > * { pointer-events: auto; }
+    #cta { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 14px 28px; background: linear-gradient(180deg, #ffce3a, #f08a1c); color: #2b1700; font-weight: 800; font-size: 18px; border: 0; border-radius: 999px; box-shadow: 0 6px 0 rgba(0,0,0,.25), 0 12px 24px rgba(0,0,0,.35); display: none; }
+    #cta.show { display: block; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } }
+    #score { position: fixed; top: env(safe-area-inset-top, 12px); left: 16px; font-weight: 800; font-size: 18px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+    #hint  { position: fixed; left: 50%; top: 30%; transform: translateX(-50%); font-size: 22px; font-weight: 700; opacity: .9; text-align: center; }
+  </style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <div id="ui">
+    <div id="score">0</div>
+    <div id="hint">Tap to play</div>
+    <button id="cta" type="button">Install Now</button>
+  </div>
+
+  <script>
+  const CONFIG = {
+    sessionSeconds: 30,
+    spawnEverySeconds: 1.2,
+    difficultyRamp: 1.05,
+    enemyCount: 12,
+    enemyHp: 1,
+    enemySpeed: 90,
+    playerDamage: 1,
+    tapRadius: 56,
+    winScore: 12,
+    failOnEscape: true,
+    palette: ["#1c2541","#3a506b","#5bc0be","#ffce3a","#f08a1c"],
+    showHintAfterMs: 1500,
+    ctaText: "Install Now",
+    showCtaAfterScore: 6,
+    showCtaAfterMs: 12000
+  };
+
+  const Net = {
+    ready() {
+      try { window.mraid && mraid.getState() === "loading" ? mraid.addEventListener("ready", () => {}) : null; } catch(e){}
+    },
+    install() {
+      try { window.mraid && mraid.open(""); } catch(e){}
+      try { window.FbPlayableAd && FbPlayableAd.onCTAClick(); } catch(e){}
+      try { window.ExitApi && ExitApi.exit(); } catch(e){}
+      try { window.parent && window.parent.postMessage("install","*"); } catch(e){}
+      try { window.gameEnd && gameEnd(); } catch(e){}
+    },
+    gameReady()  { try { window.gameReady && gameReady(); } catch(e){} },
+    gameStart()  { try { window.gameStart && gameStart(); } catch(e){} },
+    gameEnd(win) { try { window.gameEnd  && gameEnd(!!win); } catch(e){} },
+  };
+
+  const stage = document.getElementById("stage");
+  const ctx   = stage.getContext("2d");
+  const ui    = { score: document.getElementById("score"), hint: document.getElementById("hint"), cta: document.getElementById("cta") };
+
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = stage.width  = Math.floor(window.innerWidth  * dpr);
+    H = stage.height = Math.floor(window.innerHeight * dpr);
+    stage.style.width  = window.innerWidth  + "px";
+    stage.style.height = window.innerHeight + "px";
+  }
+  window.addEventListener("resize", resize); resize();
+
+  const state = { score: 0, time: 0, ended: false, targets: [], spawnAt: 0, started: false };
+
+  function spawn() {
+    const r = 28 * dpr;
+    state.targets.push({
+      x: Math.random() * (W - 2*r) + r,
+      y: -r,
+      vy: CONFIG.enemySpeed * dpr * Math.pow(CONFIG.difficultyRamp, state.score),
+      r,
+      hp: CONFIG.enemyHp,
+      color: CONFIG.palette[(state.score) % CONFIG.palette.length],
+    });
+  }
+
+  function onInput(x, y) {
+    if (!state.started) start();
+    if (state.ended) return;
+    x *= dpr; y *= dpr;
+    for (let i = state.targets.length - 1; i >= 0; i--) {
+      const t = state.targets[i];
+      if (Math.hypot(t.x - x, t.y - y) < t.r + CONFIG.tapRadius * dpr * 0.5) {
+        t.hp -= CONFIG.playerDamage;
+        if (t.hp <= 0) {
+          state.targets.splice(i, 1);
+          state.score += 1;
+          ui.score.textContent = state.score;
+          if (state.score >= CONFIG.winScore) end(true);
+          if (state.score >= CONFIG.showCtaAfterScore) showCTA();
+        }
+        return;
+      }
+    }
+  }
+
+  function showCTA() { ui.cta.classList.add("show"); }
+  function start() { state.started = true; ui.hint.style.display = "none"; Net.gameStart(); }
+  function end(win) { if (state.ended) return; state.ended = true; showCTA(); Net.gameEnd(win); }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (state.started && !state.ended) {
+      state.time += dt;
+      state.spawnAt -= dt;
+      if (state.spawnAt <= 0 && state.targets.length < CONFIG.enemyCount) {
+        spawn(); state.spawnAt = CONFIG.spawnEverySeconds;
+      }
+      for (let i = state.targets.length - 1; i >= 0; i--) {
+        const t = state.targets[i];
+        t.y += t.vy * dt;
+        if (t.y - t.r > H) {
+          state.targets.splice(i, 1);
+          if (CONFIG.failOnEscape) end(false);
+        }
+      }
+      if (state.time >= CONFIG.sessionSeconds || state.time * 1000 >= CONFIG.showCtaAfterMs) showCTA();
+    }
+    ctx.fillStyle = CONFIG.palette[0];
+    ctx.fillRect(0, 0, W, H);
+    for (const t of state.targets) {
+      ctx.fillStyle = t.color;
+      ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI*2); ctx.fill();
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function pos(e) {
+    const r = stage.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return [t.clientX - r.left, t.clientY - r.top];
+  }
+  stage.addEventListener("pointerdown", e => { const [x,y] = pos(e); onInput(x,y); }, { passive: true });
+
+  ui.cta.textContent = CONFIG.ctaText;
+  ui.cta.addEventListener("click", () => Net.install());
+
+  setTimeout(() => { if (!state.started) ui.hint.style.display = "block"; }, CONFIG.showHintAfterMs);
+
+  Net.ready(); Net.gameReady();
+  </script>
+</body>
+</html>

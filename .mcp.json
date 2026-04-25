@@ -1,0 +1,9 @@
+{
+  "_comment": "Project-scoped MCP servers. Claude Code auto-loads this file. After first launch, run `/mcp` to authorize Scenario via OAuth.",
+  "mcpServers": {
+    "scenario": {
+      "type": "http",
+      "url": "https://mcp.scenario.com/?agent=claude-code&auth=oauth"
+    }
+  }
+}
