@@ -1,38 +1,39 @@
 @import "tailwindcss";
 
 /* ─── Design tokens ─────────────────────────────────────────────────────────
-   Aesthetic: engineering logbook / industrial blueprint.
-   Warm charcoal canvas, single forge-orange accent, Fraunces italic for
-   editorial display, JetBrains Mono for everything else.
+   Aesthetic: studio / atelier. A modern, readable workspace for builders.
+   Inter for body (friendlier than mono), Fraunces italic for editorial heads,
+   JetBrains Mono only for ids / paths / code. Warmer surface, gentler contrast.
 */
 
 @theme {
   --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans:    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-sans:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --color-canvas:    #0d0d0e;
-  --color-surface:   #161618;
-  --color-surface-2: #1c1c1f;
-  --color-line:      #2a2a2e;
-  --color-line-2:    #3a3a40;
-  --color-text:      #ebe8df;
+  --color-canvas:    #14141a;
+  --color-surface:   #1c1c24;
+  --color-surface-2: #24242c;
+  --color-line:      #2f2f3a;
+  --color-line-2:    #40404e;
+  --color-text:      #ecebe5;
   --color-text-2:    #b8b6ad;
-  --color-muted:     #75747a;
-  --color-faint:     #4a4a4f;
+  --color-muted:     #82808a;
+  --color-faint:     #54525c;
 
-  --color-forge:    #ff5722;   /* the one accent */
-  --color-saffron:  #f4c430;
-  --color-emerald:  #4ade80;
-  --color-rust:     #f87171;
+  --color-forge:    #ff6e3d;     /* slightly warmer/softer than the previous #ff5722 */
+  --color-saffron:  #f5c54a;
+  --color-emerald:  #6dd09a;
+  --color-rust:     #f47878;
 }
 
 html, body, #root {
   height: 100%;
   background: var(--color-canvas);
   color: var(--color-text);
-  font-family: var(--font-mono);
-  font-feature-settings: "ss02", "calt", "zero";
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -41,18 +42,16 @@ body::before {
   content: "";
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background-image:
-    radial-gradient(circle at 18% -10%, rgba(255, 87, 34, 0.07), transparent 45%),
-    radial-gradient(circle at 110% 110%, rgba(244, 196, 48, 0.04), transparent 50%);
+    radial-gradient(circle at 18% -10%, rgba(255, 110, 61, 0.06), transparent 45%),
+    radial-gradient(circle at 110% 110%, rgba(245, 197, 74, 0.04), transparent 50%);
 }
 
-/* Hairline tracking for serif display */
-.font-display { font-family: var(--font-display); font-feature-settings: "ss01", "ss02"; }
+.font-display { font-family: var(--font-display); }
+.font-mono    { font-family: var(--font-mono); }
 
-/* Selection */
 ::selection { background: var(--color-forge); color: var(--color-canvas); }
 
-/* Scrollbars (dark) */
-::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-line-2); }
@@ -60,71 +59,74 @@ body::before {
 /* Subtle blueprint grid (used on hero/empty states) */
 .bp-grid {
   background-image:
-    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
-  background-size: 32px 32px;
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 36px 36px;
   background-position: -1px -1px;
 }
 
 /* Markdown content (brief.md) */
-.prose-blueprint { color: var(--color-text); font-size: 14px; line-height: 1.7; }
-.prose-blueprint h1, .prose-blueprint h2, .prose-blueprint h3 {
+.prose-studio { color: var(--color-text); font-size: 15px; line-height: 1.7; }
+.prose-studio h1, .prose-studio h2, .prose-studio h3 {
   font-family: var(--font-display);
   font-style: italic;
   font-weight: 400;
   letter-spacing: -0.01em;
   color: var(--color-text);
-  margin: 2em 0 0.6em;
+  margin: 1.6em 0 0.5em;
 }
-.prose-blueprint h1 { font-size: 30px; margin-top: 0; }
-.prose-blueprint h2 { font-size: 22px; }
-.prose-blueprint h3 { font-size: 17px; }
-.prose-blueprint p { margin: 0.85em 0; color: var(--color-text-2); }
-.prose-blueprint a { color: var(--color-forge); text-decoration: underline; text-underline-offset: 3px; }
-.prose-blueprint code {
+.prose-studio h1 { font-size: 32px; margin-top: 0; }
+.prose-studio h2 { font-size: 24px; }
+.prose-studio h3 { font-size: 19px; }
+.prose-studio p { margin: 0.85em 0; color: var(--color-text-2); }
+.prose-studio a { color: var(--color-forge); text-decoration: underline; text-underline-offset: 3px; }
+.prose-studio code {
   font-family: var(--font-mono);
   background: var(--color-surface-2);
   border: 1px solid var(--color-line);
   padding: 1px 6px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--color-text);
+  border-radius: 3px;
 }
-.prose-blueprint pre {
+.prose-studio pre {
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   padding: 14px 16px;
   overflow-x: auto;
-  font-size: 12.5px;
+  font-size: 13px;
   margin: 1em 0;
+  border-radius: 4px;
 }
-.prose-blueprint pre code { background: transparent; border: 0; padding: 0; }
-.prose-blueprint ul, .prose-blueprint ol { padding-left: 1.5em; margin: 0.6em 0; color: var(--color-text-2); }
-.prose-blueprint li { margin: 0.3em 0; }
-.prose-blueprint blockquote {
-  border-left: 2px solid var(--color-forge);
-  padding-left: 14px;
+.prose-studio pre code { background: transparent; border: 0; padding: 0; }
+.prose-studio ul, .prose-studio ol { padding-left: 1.5em; margin: 0.6em 0; color: var(--color-text-2); }
+.prose-studio li { margin: 0.3em 0; }
+.prose-studio blockquote {
+  border-left: 3px solid var(--color-forge);
+  padding-left: 16px;
   margin: 1em 0;
   color: var(--color-text-2);
   font-style: italic;
   font-family: var(--font-display);
+  font-size: 17px;
 }
-.prose-blueprint hr { border: 0; border-top: 1px solid var(--color-line); margin: 2em 0; }
-.prose-blueprint table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 1em 0; }
-.prose-blueprint th, .prose-blueprint td { border-bottom: 1px solid var(--color-line); padding: 8px 10px; text-align: left; }
-.prose-blueprint th { color: var(--color-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10.5px; }
+.prose-studio hr { border: 0; border-top: 1px solid var(--color-line); margin: 2em 0; }
+.prose-studio table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 1em 0; }
+.prose-studio th, .prose-studio td { border-bottom: 1px solid var(--color-line); padding: 10px 12px; text-align: left; }
+.prose-studio th { color: var(--color-muted); font-weight: 600; font-size: 12px; }
 
 /* Page enter animation */
 @keyframes page-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.page-in { animation: page-in 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.page-in { animation: page-in 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 
 @keyframes row-in {
   from { opacity: 0; transform: translateY(2px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.stagger > * { animation: row-in 240ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.stagger > * { animation: row-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .stagger > *:nth-child(1) { animation-delay: 20ms; }
 .stagger > *:nth-child(2) { animation-delay: 50ms; }
 .stagger > *:nth-child(3) { animation-delay: 80ms; }
@@ -135,9 +137,13 @@ body::before {
 .stagger > *:nth-child(8) { animation-delay: 230ms; }
 .stagger > *:nth-child(n+9) { animation-delay: 260ms; }
 
-/* Marquee spin for status dots */
+/* Status dot pulse */
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.35; }
 }
 .pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+/* Hairline row for tables/lists */
+.row-hairline { border-bottom: 1px solid var(--color-line); }
+.row-hairline:hover { background: var(--color-surface-2); }

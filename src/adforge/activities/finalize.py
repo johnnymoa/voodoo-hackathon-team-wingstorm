@@ -19,12 +19,12 @@ from temporalio import activity
 class FinalizeRunInput(BaseModel):
     run_dir: str
     run_id: str
-    pipeline: str                          # "playable_forge" | "creative_forge" | "full_forge"
-    target_id: str
+    pipeline: str                          # "creative_forge" | "playable_forge"
+    project_id: str
+    config_id: str = "default"
     started_at: str                        # ISO-8601, set by the workflow
     params: dict[str, Any] = {}            # the workflow's input args (for reproducibility)
     artifact_globs: list[str] = []         # patterns to include, e.g. ["*.html", "*.json", "**/*.html"]
-    children: list[str] = []               # child run_ids (full_forge → [creative_run, playable_run])
     status: str = "completed"
 
 
@@ -60,12 +60,12 @@ async def finalize_run(inp: FinalizeRunInput) -> FinalizeRunResult:
     manifest = {
         "run_id": inp.run_id,
         "pipeline": inp.pipeline,
-        "target_id": inp.target_id,
+        "project_id": inp.project_id,
+        "config_id": inp.config_id,
         "status": inp.status,
         "started_at": inp.started_at,
         "completed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "params": inp.params,
-        "children": inp.children,
         "artifacts": artifacts,
     }
     manifest_path = run_dir / "manifest.json"

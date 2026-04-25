@@ -15,11 +15,11 @@ export function Mono({ value, className = "" }: { value: string; className?: str
         } catch { /* clipboard may be unavailable; ignore */ }
       }}
       title={copied ? "copied" : "click to copy"}
-      className={`group inline-flex items-center gap-1.5 text-[12px] text-[var(--color-text)] hover:text-[var(--color-forge)] transition-colors ${className}`}
+      className={`group inline-flex items-center gap-2 font-mono text-[12.5px] text-[var(--color-text-2)] hover:text-[var(--color-forge)] transition-colors ${className}`}
     >
-      <span className="truncate font-mono">{value}</span>
-      <span className="text-[10px] text-[var(--color-faint)] group-hover:text-[var(--color-forge)]">
-        {copied ? "✓" : "⧉"}
+      <span className="truncate">{value}</span>
+      <span className="text-[11px] text-[var(--color-faint)] group-hover:text-[var(--color-forge)]">
+        {copied ? "copied" : "copy"}
       </span>
     </button>
   );

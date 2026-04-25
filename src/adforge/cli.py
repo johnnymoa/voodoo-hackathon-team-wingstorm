@@ -1,14 +1,12 @@
 """adforge CLI — the surface for humans.
 
-Three groups, mirroring the architecture:
+  adforge worker                       long-lived Temporal worker
+  adforge api                          FastAPI shim that powers the UI
+  adforge run    <pipeline> ...        start a workflow against a project
+  adforge tools  <helper>  ...         standalone helpers (no Temporal)
 
-  adforge worker                    long-lived Temporal worker (hosts activities + workflows)
-  adforge run    <pipeline> ...     start a workflow against a target
-  adforge tools  <helper>  ...      standalone helpers (no Temporal, no worker)
-
-A run takes a `--target <id>`, where `<id>` is a folder under `targets/`.
-The CLI resolves `targets/<id>/` into a Target object (video + assets + metadata)
-and hands the workflow already-resolved paths plus a fresh `run_id`.
+A run takes `--project <id>`, where `<id>` is a folder under `projects/`.
+Optional `--config <id>` picks a named PipelineConfig preset (default: "default").
 """
 
 from __future__ import annotations
@@ -22,20 +20,21 @@ import typer
 from rich import print as rprint
 from rich.table import Table
 
-from adforge import targets as targets_mod
+from adforge import projects as projects_mod
 from adforge import worker as worker_mod
 from adforge.activities.types import VariationSpec
 from adforge.config import RUNS_DIR, settings
+from adforge.pipelines import PIPELINES, find_config
 from adforge.runs import ensure_run_dir, list_runs, make_run_id
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode="rich")
-run = typer.Typer(no_args_is_help=True, help="Launch Temporal workflows against a target.")
+run = typer.Typer(no_args_is_help=True, help="Launch Temporal workflows against a project.")
 tools = typer.Typer(no_args_is_help=True, help="Standalone helpers (no Temporal needed).")
 app.add_typer(run, name="run")
 app.add_typer(tools, name="tools")
 
 
-# ───── worker ───────────────────────────────────────────────────────────
+# ───── worker / api ─────────────────────────────────────────────────────
 
 
 @app.command()
@@ -82,28 +81,41 @@ async def _start_workflow(workflow_name: str, arg, workflow_id: str) -> None:
     rprint(result.model_dump() if hasattr(result, "model_dump") else result)
 
 
-def _resolve_target(target_id: str) -> targets_mod.Target:
+def _resolve_project(project_id: str) -> projects_mod.Project:
     try:
-        return targets_mod.load(target_id)
+        return projects_mod.load(project_id)
     except FileNotFoundError as e:
         rprint(f"[red]error:[/red] {e}")
         raise typer.Exit(code=2)
 
 
+def _resolve_config(pipeline_id: str, config_id: str) -> str:
+    """Validate the config exists for this pipeline; bail with a helpful list if not."""
+    cfg = find_config(pipeline_id, config_id)
+    if cfg is None:
+        spec = next((p for p in PIPELINES if p.id == pipeline_id), None)
+        available = ", ".join(c.id for c in (spec.configs if spec else []))
+        rprint(f"[red]error:[/red] config '{config_id}' not found for {pipeline_id}. Available: {available}")
+        raise typer.Exit(code=2)
+    return config_id
+
+
 @run.command("playable")
 def run_playable(
-    target: str = typer.Option(..., "--target", help="Target id (folder under targets/)"),
+    project: str = typer.Option(..., "--project", help="Project id (folder under projects/)"),
+    config:  str = typer.Option("default", "--config", help="PipelineConfig preset id"),
     variants: int = typer.Option(4, "--variants", help="How many baseline variants to emit"),
 ) -> None:
     """video + assets → playable HTML + variants."""
     from adforge.pipelines.playable_forge import PlayableForgeInput
 
-    t = _resolve_target(target)
-    if not t.has_video():
-        rprint(f"[red]error:[/red] target '{t.id}' has no video.mp4 — playable_forge needs one.")
+    p = _resolve_project(project)
+    if not p.has_video():
+        rprint(f"[red]error:[/red] project '{p.id}' has no video.mp4 — playable_forge needs one.")
         raise typer.Exit(code=2)
+    cfg_id = _resolve_config("playable_forge", config)
 
-    rid = make_run_id("playable", t.id)
+    rid = make_run_id("playable", p.id)
     run_dir = str(ensure_run_dir(rid))
 
     default_variants = [
@@ -114,8 +126,8 @@ def run_playable(
     ][:variants]
 
     inp = PlayableForgeInput(
-        target_id=t.id, run_id=rid, run_dir=run_dir,
-        video_path=t.video_path, asset_dir=t.asset_dir,
+        project_id=p.id, run_id=rid, run_dir=run_dir, config_id=cfg_id,
+        video_path=p.video_path, asset_dir=p.asset_dir,
         variants=default_variants,
     )
     asyncio.run(_start_workflow("playable_forge", inp, workflow_id=rid))
@@ -123,62 +135,32 @@ def run_playable(
 
 @run.command("creative")
 def run_creative(
-    target: str = typer.Option(..., "--target", help="Target id (folder under targets/)"),
-    category: Optional[str] = typer.Option(None, "--category", help="Override target.category_id"),
-    country: Optional[str] = typer.Option(None, "--country",   help="Override target.country"),
+    project: str = typer.Option(..., "--project", help="Project id (folder under projects/)"),
+    config:  str = typer.Option("default", "--config", help="PipelineConfig preset id"),
+    category: Optional[str] = typer.Option(None, "--category", help="Override project.category_id"),
+    country:  Optional[str] = typer.Option(None, "--country",  help="Override project.country"),
     network: str = typer.Option("TikTok", "--network"),
     period: str = typer.Option("month", "--period"),
     sample: int = typer.Option(30, "--sample"),
     render_http: bool = typer.Option(False, "--render-http", help="Render via Scenario HTTP API (else use the MCP)"),
 ) -> None:
-    """target → market-informed brief + Scenario prompt."""
+    """project → market insights → storyboard → video ad creative."""
     from adforge.pipelines.creative_forge import CreativeForgeInput
 
-    t = _resolve_target(target)
-    rid = make_run_id("creative", t.id)
+    p = _resolve_project(project)
+    cfg_id = _resolve_config("creative_forge", config)
+    rid = make_run_id("creative", p.id)
     run_dir = str(ensure_run_dir(rid))
 
     inp = CreativeForgeInput(
-        target_id=t.id, run_id=rid, run_dir=run_dir,
-        target_term=t.name,
-        category=category or t.category_id,
-        country=country or t.country,
+        project_id=p.id, run_id=rid, run_dir=run_dir, config_id=cfg_id,
+        target_term=p.name,
+        category=category or p.category_id,
+        country=country or p.country,
         network=network, period=period,
         sample=sample, render_with_scenario_http=render_http,
     )
     asyncio.run(_start_workflow("creative_forge", inp, workflow_id=rid))
-
-
-@run.command("full")
-def run_full(
-    target: str = typer.Option(..., "--target", help="Target id (folder under targets/)"),
-    category: Optional[str] = typer.Option(None, "--category", help="Override target.category_id"),
-    country: Optional[str] = typer.Option(None, "--country",   help="Override target.country"),
-    network: str = typer.Option("TikTok", "--network"),
-    period: str = typer.Option("month", "--period"),
-    sample: int = typer.Option(30, "--sample"),
-    render_http: bool = typer.Option(False, "--render-http"),
-) -> None:
-    """The merged demo: target → brief + Scenario prompt + market-informed playable + variants."""
-    from adforge.pipelines.full_forge import FullForgeInput
-
-    t = _resolve_target(target)
-    if not t.has_video():
-        rprint(f"[red]error:[/red] target '{t.id}' has no video.mp4 — full_forge needs one.")
-        raise typer.Exit(code=2)
-
-    rid = make_run_id("full", t.id)
-    run_dir = str(ensure_run_dir(rid))
-
-    inp = FullForgeInput(
-        target_id=t.id, run_id=rid, run_dir=run_dir,
-        target_term=t.name, video_path=t.video_path, asset_dir=t.asset_dir,
-        category=category or t.category_id,
-        country=country or t.country,
-        network=network, period=period,
-        sample=sample, render_with_scenario_http=render_http,
-    )
-    asyncio.run(_start_workflow("full_forge", inp, workflow_id=rid))
 
 
 # ───── tools (no Temporal required) ──────────────────────────────────────
@@ -192,26 +174,40 @@ def tools_env() -> None:
     rprint(masked)
 
 
-@tools.command("targets")
-def tools_targets(target_id: Optional[str] = typer.Argument(None, help="If given, show details. Else list all.")) -> None:
-    """List targets, or show details for one."""
-    if target_id:
-        t = _resolve_target(target_id)
-        rprint(t.model_dump())
+@tools.command("projects")
+def tools_projects(project_id: Optional[str] = typer.Argument(None, help="If given, show details. Else list all.")) -> None:
+    """List projects, or show details for one."""
+    if project_id:
+        p = _resolve_project(project_id)
+        rprint(p.model_dump())
         return
 
-    ids = targets_mod.list_targets()
+    ids = projects_mod.list_projects()
     if not ids:
-        rprint("[yellow]no targets[/yellow] — see targets/README.md to add one.")
+        rprint("[yellow]no projects[/yellow] — see projects/README.md to add one.")
         return
-    table = Table(title="targets/")
+    table = Table(title="projects/")
     table.add_column("id"); table.add_column("name"); table.add_column("video"); table.add_column("assets")
-    for tid in ids:
+    for pid in ids:
         try:
-            t = targets_mod.load(tid)
-            table.add_row(t.id, t.name, "✓" if t.has_video() else "—", "✓" if t.has_assets() else "—")
+            p = projects_mod.load(pid)
+            table.add_row(p.id, p.name, "✓" if p.has_video() else "—", "✓" if p.has_assets() else "—")
         except Exception as e:
-            table.add_row(tid, f"[red]err: {e}[/red]", "?", "?")
+            table.add_row(pid, f"[red]err: {e}[/red]", "?", "?")
+    rprint(table)
+
+
+@tools.command("pipelines")
+def tools_pipelines() -> None:
+    """List pipelines + their configs."""
+    table = Table(title="pipelines/")
+    table.add_column("id"); table.add_column("name"); table.add_column("track"); table.add_column("configs"); table.add_column("needs")
+    for spec in PIPELINES:
+        table.add_row(
+            spec.id, spec.name, spec.track,
+            ", ".join(c.id for c in spec.configs),
+            ", ".join(spec.needs) or "—",
+        )
     rprint(table)
 
 
@@ -231,14 +227,20 @@ def tools_runs(run_id: Optional[str] = typer.Argument(None, help="If given, show
         rprint("[yellow]no runs[/yellow]")
         return
     table = Table(title="runs/")
-    table.add_column("run_id"); table.add_column("pipeline"); table.add_column("target"); table.add_column("status")
+    table.add_column("run_id"); table.add_column("pipeline"); table.add_column("project"); table.add_column("config"); table.add_column("status")
     for rid in ids:
         manifest = RUNS_DIR / rid / "manifest.json"
         if manifest.is_file():
             m = json.loads(manifest.read_text())
-            table.add_row(rid, m.get("pipeline", "?"), m.get("target_id", "?"), m.get("status", "?"))
+            table.add_row(
+                rid,
+                m.get("pipeline", "?"),
+                m.get("project_id", m.get("target_id", "?")),
+                m.get("config_id", "?"),
+                m.get("status", "?"),
+            )
         else:
-            table.add_row(rid, "?", "?", "[yellow]no manifest[/yellow]")
+            table.add_row(rid, "?", "?", "?", "[yellow]no manifest[/yellow]")
     rprint(table)
 
 

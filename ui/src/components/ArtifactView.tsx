@@ -58,7 +58,7 @@ function MarkdownPane({ runId, artifact }: { runId: string; artifact: Artifact }
   return (
     <Frame label="markdown" actions={<OpenInTab href={api.artifactUrl(runId, artifact.name)} />}>
       <article
-        className="prose-blueprint p-8 max-w-[78ch] mx-auto"
+        className="prose-studio p-8 max-w-[78ch] mx-auto"
         // marked output is from local files we wrote ourselves; OK to dangerouslySetInnerHTML in this internal tool
         dangerouslySetInnerHTML={{ __html: html }}
       />
@@ -76,7 +76,7 @@ function JsonPane({ runId, artifact }: { runId: string; artifact: Artifact }) {
   } catch { /* leave as-is */ }
   return (
     <Frame label="json" actions={<OpenInTab href={api.artifactUrl(runId, artifact.name)} />}>
-      <pre className="overflow-auto p-6 text-[12px] leading-relaxed text-[var(--color-text-2)]">{pretty}</pre>
+      <pre className="overflow-auto p-6 text-[13px] leading-relaxed text-[var(--color-text-2)]">{pretty}</pre>
     </Frame>
   );
 }
@@ -109,7 +109,7 @@ function Frame({
 }: { label: string; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="border border-[var(--color-line)] bg-[var(--color-surface)]">
-      <div className="flex items-center justify-between border-b border-[var(--color-line)] bg-[var(--color-surface-2)] px-4 py-2 text-[10.5px] uppercase tracking-[0.16em] text-[var(--color-muted)]">
+      <div className="flex items-center justify-between border-b border-[var(--color-line)] bg-[var(--color-surface-2)] px-5 py-2.5 text-[12px] text-[var(--color-muted)]">
         <span>{label}</span>
         <div>{actions}</div>
       </div>

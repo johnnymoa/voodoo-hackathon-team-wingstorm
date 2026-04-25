@@ -1,14 +1,8 @@
 """Temporal worker — long-running process that hosts activities + workflows.
 
-Run in one terminal:
-
     uv run adforge worker
-
-…and in another terminal kick off a workflow:
-
-    uv run adforge run playable --video videos/castle.mp4
-    uv run adforge run creative --target "castle clasher"
-    uv run adforge run full     --target "castle clasher" --video videos/castle.mp4
+    uv run adforge run creative --project castle_clashers
+    uv run adforge run playable --project castle_clashers
 """
 
 from __future__ import annotations

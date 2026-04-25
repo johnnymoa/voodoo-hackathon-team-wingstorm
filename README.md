@@ -1,42 +1,39 @@
 # adforge
 
-> A single forge for ad assets.
+> Build ads for your games, faster.
 
-You define a **target** (everything you know about a game). You pick a
+You define a **project** (everything you know about a game). You pick a
 **pipeline** (a recipe). You get a **run** (a self-describing folder of
-artifacts).
+artifacts). Each pipeline has named **configs** you can A/B as you iterate.
 
 ```
-   TARGET ──────────►   PIPELINE  ──────────►   RUN
-   (a game)             (a recipe)              (an output)
+   PROJECT ─────────►   PIPELINE ─────────►   RUN
+   (a game)             (a recipe)            (an output)
 
-   targets/<id>/                                runs/<id>/
-   ├ target.json        creative_forge ──┐      ├ manifest.json
-   ├ video.mp4          playable_forge ──┤───►  ├ brief.md
-   ├ assets/            full_forge       ──┘    ├ playable.html
-   └ description, …                             └ patterns.json
+   projects/<id>/                             runs/<run_id>/
+   ├ project.json       creative_forge ──┐    ├ manifest.json
+   ├ video.mp4          playable_forge ──┘──► ├ brief.md
+   ├ assets/                                  ├ playable.html
+   └ description, …                           └ patterns.json
 ```
 
-Built for VoodooHack (Paris, Apr 26–27 2026). Track 3 is `creative_forge`.
-Track 2 is `playable_forge`. The demo win is `full_forge` — the only pipeline
-where the playable is *informed* by what's winning in market right now.
+Built for VoodooHack (Paris, Apr 26–27 2026). Two pipelines today:
+
+- `creative_forge` — Track 3, the **video-ad** pipeline (web research → market insights → storyboard → AI-generated video creative).
+- `playable_forge` — Track 2, the **playable** pipeline (video + assets → single-file HTML playable + variants).
 
 ## Top-down layout
 
 ```
 adforge/
-├── targets/                INPUTS.   one folder per game (target.json + optional video.mp4 + assets/)
-├── runs/                   OUTPUTS.  one folder per execution (manifest.json + artifacts)
-├── src/adforge/            FORGE.    code, top-down: config → connectors → activities → pipelines → cli + api
-├── ui/                     VIEWER.   Vite + React + Tailwind. Reads runs/ + targets/ via api.py.
-├── docs/                   notes
-├── .env / .env.example     secrets
-└── pyproject.toml          uv project manifest
+├── projects/         INPUTS.   one folder per game (project.json + optional video.mp4 + assets/)
+├── runs/             OUTPUTS.  one folder per execution (manifest.json + artifacts)
+├── src/adforge/      FORGE.    config → connectors → activities → pipelines → cli + api
+├── ui/               VIEWER.   Vite + React + Tailwind. Reads the API.
+├── docs/             notes
+├── .env / .env.example
+└── pyproject.toml
 ```
-
-Three top-level data buckets, one idea each. There used to be a `reference/`
-folder for example playables — those moved into `src/adforge/templates/examples/`
-where the playable build activity uses them as in-context.
 
 ## Setup
 
@@ -48,95 +45,92 @@ brew install temporal            # macOS — or: curl -sSf https://temporal.down
 
 ## Run
 
-You'll want five terminals (each is a long-lived process; only the last one is per-run).
-
 ```bash
-# 1) Temporal local dev server          → http://localhost:8233
+# 1) Temporal local dev          → http://localhost:8233
 temporal server start-dev
 
 # 2) adforge worker (hosts activities + workflows)
 uv run adforge worker
 
-# 3) FastAPI shim that powers the UI    → http://127.0.0.1:8765
+# 3) FastAPI shim (powers the UI) → http://127.0.0.1:8765
 uv run adforge api
 
-# 4) Vite dev server                    → http://localhost:5173
+# 4) Vite UI                      → http://localhost:5173
 cd ui && npm install && npm run dev
 
-# 5) kick off a workflow against a target
-uv run adforge run creative --target castle_clashers
-uv run adforge run playable --target castle_clashers
-uv run adforge run full     --target castle_clashers
+# 5) kick off a pipeline against a project
+uv run adforge run creative --project castle_clashers
+uv run adforge run playable --project castle_clashers --config default
 ```
 
-Open <http://localhost:5173> for the **engineering log book** view of the forge.
-Open <http://localhost:8233> for the raw **orchestration debugger**. Every run
-is deep-linked between the two via its `run_id` (also the Temporal `workflow_id`).
+The UI is the friendly view. The Temporal Web UI at <http://localhost:8233>
+is the orchestration debugger. Every run deep-links between the two.
 
-## What a target looks like
+## Adding a project
 
-`target.json` is the kitchen-sink for everything known about a game.
-The pipelines auto-pull `category_id`, `country`, `description`, `name` from it
-— nothing has to be re-entered on the CLI.
+A project is a folder with a `project.json` inside. The minimum is one line:
+
+```bash
+mkdir -p projects/royal_match
+echo '{"name":"Royal Match"}' > projects/royal_match/project.json
+```
+
+Optional fields help pipelines do better work — none are required:
 
 ```json
 {
-  "name":        "Castle Clashers",
-  "genre":       "tower-defense / clash hybrid",
-  "description": "Tap-to-defend tower-defense hybrid where players defend their castle...",
+  "name":        "Royal Match",
+  "genre":       "match-3",
+  "description": "Match-3 puzzle with king-saving meta-narrative.",
   "category_id": "7012",
   "country":     "US",
-  "app_id":      null,
-  "store_urls":  { "ios": "...", "android": "..." },
-  "notes":       "Hackathon Track 2 reference kit."
+  "store_urls":  { "ios": "https://apps.apple.com/..." }
 }
 ```
 
-## Adding a new target
+Drop `video.mp4` and `assets/` next to it if you want to run `playable_forge`.
+
+## Pipelines + configs
+
+Each pipeline has named **configs** — presets that swap models, prompts, or
+code paths. Add new ones in `src/adforge/pipelines/__init__.py`. Pick one with
+`--config` (CLI) or via the dropdown on the project detail page (UI).
 
 ```bash
-mkdir -p targets/royal_match
-$EDITOR targets/royal_match/target.json    # at minimum: { "name": "Royal Match" }
-# drop video.mp4 + assets/ alongside if you want to run playable / full
-
-uv run adforge tools targets               # confirm it shows up
-uv run adforge run creative --target royal_match
+uv run adforge tools pipelines              # list pipelines + their configs
+uv run adforge run creative --project castle_clashers --config default
 ```
 
-## Standalone tools (no Temporal needed)
+Iterate fast: clone `default` to `claude-prose`, swap the activity, ship a new
+config. Old runs stay reproducible — their `config_id` is in the manifest.
+
+## Standalone tools
 
 ```bash
 uv run adforge tools env                              # resolved settings
-uv run adforge tools targets                          # list targets
-uv run adforge tools targets castle_clashers         # show one target's details
+uv run adforge tools projects                         # list projects
+uv run adforge tools projects castle_clashers        # show one
+uv run adforge tools pipelines                        # list pipelines + configs
 uv run adforge tools runs                             # list runs
 uv run adforge tools runs <run_id>                   # show one manifest
-uv run adforge tools st-search "royal match"          # SensorTower search
-uv run adforge tools st-top-creatives --network TikTok
+uv run adforge tools st-search "royal match"          # SensorTower
 uv run adforge tools inline runs/<run_id>/playable.html
 ```
 
 ## Skills (Claude Code)
 
-Defined in `.claude/skills/`. Invoke with the Skill tool inside Claude Code.
+In `.claude/skills/`. Invoke with the Skill tool inside Claude Code:
+`creative-forge`, `playable-forge`, `sensortower-research`, `inline-html-assets`,
+`scenario-generate`.
 
-- `creative-forge` — orchestrate the creative_forge pipeline
-- `playable-forge` — orchestrate the playable_forge pipeline
-- `full-forge`     — the merged demo
-- `sensortower-research` — pull / cache market data without spinning up workflows
-- `inline-html-assets` — collapse a multi-file playable into a single < 5 MB file
-- `scenario-generate` — drive Scenario MCP from a brief
-
-## Hackathon rules cheat-sheet
+## Hackathon rules
 
 - Playable: ≤ 5 MB single HTML, no external deps, mobile browser
-- ≥ 75% AI-written (Track 2 rule)
+- ≥ 75% AI-written
 - Test on <https://p.applov.in/playablePreview?create=1> before submitting
 
 ## Credits
 
-Hackathon keys live in `.env` (gitignored). Provided by Voodoo:
-- `GEMINI_API_KEY`, `SENSORTOWER_API_KEY`
-- `SCENARIO_*` provisioned at the event (auth via MCP OAuth)
-- 40 USD Claude credits — use Claude Code with the Anthropic subscription
-- Mistral credits — used by `creative_forge` for cheap per-creative labeling
+Hackathon keys live in `.env` (gitignored). Provided by Voodoo: `GEMINI_API_KEY`,
+`SENSORTOWER_API_KEY`, `SCENARIO_*` (via MCP OAuth). 40 USD of Anthropic credits.
+Mistral credits used by `creative_forge` for cheap per-creative labeling.

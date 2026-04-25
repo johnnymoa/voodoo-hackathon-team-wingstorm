@@ -34,13 +34,14 @@ with workflow.unsafe.imports_passed_through():
 
 
 class PlayableForgeInput(BaseModel):
-    target_id: str                        # for manifest provenance
+    project_id: str                       # for manifest provenance
     run_id: str
     run_dir: str                          # absolute path to runs/<run_id>/
+    config_id: str = "default"            # which PipelineConfig preset to apply
     video_path: str
     base_filename: str = "playable.html"
     asset_dir: str | None = None
-    market_patterns: dict[str, Any] | None = None    # from creative_forge
+    market_patterns: dict[str, Any] | None = None    # from creative_forge (when chained)
     variants: list[VariationSpec] = []
 
 
@@ -107,7 +108,8 @@ class PlayableForge:
                 run_dir=inp.run_dir,
                 run_id=inp.run_id,
                 pipeline="playable_forge",
-                target_id=inp.target_id,
+                project_id=inp.project_id,
+                config_id=inp.config_id,
                 started_at=started_at,
                 params=inp.model_dump(exclude={"market_patterns"}),
                 artifact_globs=["*.html", "*.json", "*.md"],

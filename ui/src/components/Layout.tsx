@@ -2,26 +2,25 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 
 const NAV = [
-  { to: "/targets",   label: "Targets",   glyph: "01" },
-  { to: "/pipelines", label: "Pipelines", glyph: "02" },
-  { to: "/runs",      label: "Runs",      glyph: "03" },
+  { to: "/projects",  label: "Projects" },
+  { to: "/pipelines", label: "Pipelines" },
+  { to: "/runs",      label: "Runs" },
 ];
 
 export function Layout() {
   const loc = useLocation();
   return (
     <div className="relative min-h-full">
-      {/* Top fixed nav */}
       <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-[color:var(--color-canvas)]/85 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1320px] items-center gap-6 px-6 h-12">
+        <div className="mx-auto flex h-14 max-w-[1320px] items-center gap-7 px-7">
           <NavLink
             to="/"
-            className="font-display italic text-[20px] leading-none tracking-[-0.02em] text-[var(--color-text)] hover:text-[var(--color-forge)] transition-colors"
+            className="font-display italic text-[22px] leading-none tracking-[-0.02em] text-[var(--color-text)] hover:text-[var(--color-forge)] transition-colors"
           >
             adforge
           </NavLink>
-          <span className="text-[10.5px] uppercase tracking-[0.16em] text-[var(--color-muted)]">
-            target → pipeline → run
+          <span className="hidden text-[12px] text-[var(--color-muted)] md:inline">
+            project → pipeline → run
           </span>
 
           <nav className="ml-auto flex items-center gap-1">
@@ -31,18 +30,15 @@ export function Layout() {
                 <NavLink
                   key={n.to}
                   to={n.to}
-                  className={`group flex items-center gap-2 px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] transition-colors ${
+                  className={`relative px-4 py-2 text-[13.5px] transition-colors ${
                     active
-                      ? "text-[var(--color-forge)]"
-                      : "text-[var(--color-muted)] hover:text-[var(--color-text)]"
+                      ? "text-[var(--color-text)]"
+                      : "text-[var(--color-muted)] hover:text-[var(--color-text-2)]"
                   }`}
                 >
-                  <span className="text-[10px] text-[var(--color-faint)] group-hover:text-[var(--color-text-2)]">
-                    {n.glyph}
-                  </span>
                   {n.label}
                   {active && (
-                    <span className="block h-[2px] w-3 bg-[var(--color-forge)]" />
+                    <span className="absolute inset-x-3 -bottom-[1px] h-[2px] bg-[var(--color-forge)]" />
                   )}
                 </NavLink>
               );
@@ -53,17 +49,16 @@ export function Layout() {
             href="http://localhost:8233"
             target="_blank"
             rel="noreferrer"
-            className="ml-2 flex items-center gap-1.5 border border-[var(--color-line-2)] px-2.5 py-1 text-[10.5px] uppercase tracking-[0.14em] text-[var(--color-text-2)] hover:border-[var(--color-forge)] hover:text-[var(--color-forge)]"
+            className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-2)] px-3 py-1.5 text-[12px] text-[var(--color-text-2)] hover:border-[var(--color-forge)] hover:text-[var(--color-forge)]"
             title="Open Temporal Web UI"
           >
-            <span>Temporal</span>
-            <span className="text-[10px]">↗</span>
+            Temporal
+            <span aria-hidden>↗</span>
           </a>
         </div>
       </header>
 
-      {/* Page body */}
-      <main className="relative z-10 mx-auto max-w-[1320px] px-6 py-8">
+      <main className="relative z-10 mx-auto max-w-[1320px] px-7 py-10">
         <Outlet />
       </main>
 
@@ -74,40 +69,38 @@ export function Layout() {
 
 function Footer() {
   return (
-    <footer className="mt-20 border-t border-[var(--color-line)]">
-      <div className="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--color-muted)]">
-        <span>adforge / runs viewer</span>
-        <span>v0.1.0 · localhost</span>
+    <footer className="mt-24 border-t border-[var(--color-line)]">
+      <div className="mx-auto flex max-w-[1320px] items-center justify-between px-7 py-6 text-[12px] text-[var(--color-muted)]">
+        <span>adforge</span>
+        <span>v0.2 · localhost</span>
       </div>
     </footer>
   );
 }
 
-/** Page header used by all top-level routes. Bold serif italic title + thin orange tick. */
+/** Page header used by all top-level routes. Bigger, less typographic noise. */
 export function PageHeader({
-  index, eyebrow, title, accent, right,
+  eyebrow, title, subtitle, right,
 }: {
-  index: string;
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
-  accent?: string;
+  subtitle?: string;
   right?: ReactNode;
 }) {
   return (
-    <div className="mb-8 flex items-end justify-between gap-6 border-b border-[var(--color-line)] pb-6">
+    <div className="mb-10 flex items-end justify-between gap-6 border-b border-[var(--color-line)] pb-7">
       <div className="min-w-0">
-        <div className="mb-2 flex items-center gap-3 text-[10.5px] uppercase tracking-[0.18em] text-[var(--color-muted)]">
-          <span className="text-[var(--color-forge)]">§ {index}</span>
-          <span className="h-px flex-1 bg-[var(--color-line)]" style={{ minWidth: 32 }} />
-          <span>{eyebrow}</span>
-        </div>
-        <h1 className="font-display text-[44px] leading-[1.05] tracking-[-0.015em] text-[var(--color-text)]">
-          <span className="italic">{title}</span>
-          {accent && (
-            <span className="ml-3 text-[var(--color-forge)] not-italic">·</span>
-          )}
-          {accent && <span className="ml-2 italic text-[var(--color-text-2)]">{accent}</span>}
+        {eyebrow && (
+          <div className="mb-2 text-[12px] uppercase tracking-[0.12em] text-[var(--color-muted)]">
+            {eyebrow}
+          </div>
+        )}
+        <h1 className="font-display italic text-[44px] leading-[1.05] tracking-[-0.015em] text-[var(--color-text)]">
+          {title}
         </h1>
+        {subtitle && (
+          <p className="mt-2 max-w-[60ch] text-[15px] text-[var(--color-text-2)]">{subtitle}</p>
+        )}
       </div>
       {right && <div className="shrink-0">{right}</div>}
     </div>

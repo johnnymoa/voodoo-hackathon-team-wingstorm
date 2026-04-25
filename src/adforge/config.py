@@ -1,11 +1,10 @@
 """Project config — loads .env once and exposes typed access.
 
-The four top-level data buckets at the repo root, mapped to constants:
+Three top-level data buckets at the repo root, mapped to constants:
 
-    targets/       TARGETS_DIR     pipeline inputs (one folder per game)
+    projects/      PROJECTS_DIR    pipeline inputs (one folder per game)
     runs/          RUNS_DIR        pipeline outputs (one folder per execution)
-    reference/     REFERENCE_DIR   canonical example playables, study material
-    .cache/        CACHE_DIR       SensorTower API cache (never read by pipelines)
+    .cache/        CACHE_DIR       SensorTower API cache (internal)
 
 Code never hard-codes these paths — always import from here.
 """
@@ -19,12 +18,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
+
 def _repo_root() -> Path:
-    """Project root for resolving targets/, runs/, reference/.
+    """Project root for resolving projects/, runs/.
 
     Order:
       1. ADFORGE_ROOT env var (explicit override).
-      2. Walk up from cwd looking for a marker (pyproject.toml + targets/ or runs/).
+      2. Walk up from cwd looking for a marker (pyproject.toml + src/adforge/).
       3. Fall back to cwd.
 
     This works in both editable and wheel installs — file-relative paths can't,
@@ -40,9 +40,8 @@ def _repo_root() -> Path:
 
 
 REPO_ROOT = _repo_root()
-TARGETS_DIR = REPO_ROOT / "targets"
+PROJECTS_DIR = REPO_ROOT / "projects"
 RUNS_DIR = REPO_ROOT / "runs"
-REFERENCE_DIR = REPO_ROOT / "reference"
 CACHE_DIR = REPO_ROOT / ".cache"
 
 
@@ -97,5 +96,5 @@ def settings() -> Settings:
 
 
 def ensure_dirs() -> None:
-    for d in (TARGETS_DIR, RUNS_DIR, REFERENCE_DIR, CACHE_DIR):
+    for d in (PROJECTS_DIR, RUNS_DIR, CACHE_DIR):
         d.mkdir(parents=True, exist_ok=True)

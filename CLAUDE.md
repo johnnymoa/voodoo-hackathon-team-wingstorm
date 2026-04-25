@@ -1,149 +1,127 @@
 # adforge — Voodoo Hack pipelines
 
-> A single forge for ad assets. **target → pipeline → run.**
+> **project → pipeline → run.** Three nouns, one mental model.
 
-- **`creative_forge`** — target game → market-informed brief + Scenario prompt
-- **`playable_forge`** — gameplay video → interactive HTML playable + variants
-- **`full_forge`** — chains both: target + video → brief + creative + market-informed playable
+- **`creative_forge`** — Track 3. Project → web research → market insights → storyboard → video ad creative.
+- **`playable_forge`** — Track 2. Project (with video + assets) → single-file HTML playable + variants.
+
+Each pipeline has named **configs** (PipelineConfig presets) so we can A/B model
+choices, prompts, and code paths without forking. The forge is the scaffold;
+configs are how we iterate scientifically.
 
 ## Top-down layout
 
-The repo root maps three top-level data dirs + the code dir to four ideas:
-
 ```
-targets/                INPUTS.   one folder per game (target.json + optional video.mp4 + assets/)
-runs/                   OUTPUTS.  one folder per execution (manifest.json + artifacts)
-src/adforge/            FORGE.    code, top-down: config → connectors → activities → pipelines → cli + api
-ui/                     VIEWER.   Vite + React + Tailwind. Reads runs/ + targets/ via api.py.
+projects/         INPUTS.   one folder per game
+runs/             OUTPUTS.  one folder per execution (manifest.json + artifacts)
+src/adforge/      FORGE.    code, top-down: config → connectors → activities → pipelines → cli + api
+ui/               VIEWER.   Vite + React + Tailwind. Reads the API.
 ```
 
-Plus `docs/`, `.env*`, `.mcp.json`, `pyproject.toml` at the root for setup/config.
+Plus `docs/`, `.env*`, `.mcp.json`, `pyproject.toml` at root.
 
-There used to be a `reference/` folder with example playables. That was dead
-weight — the examples now live in `src/adforge/templates/examples/` where the
-playable-build activity uses them as in-context references.
+## Mental model
 
-## Mental model: target → pipeline → run
+A **project** is the kitchen-sink folder for everything we know about a game
+(name, genre, description, category, optional video + assets). Schema lives
+in `src/adforge/projects.py`.
 
-A **target** is the kitchen-sink folder for everything we know about a game:
-display name, genre, description, store category, optional gameplay video,
-optional asset kit. The schema lives in `src/adforge/targets.py` (Target model)
-and is documented in the docstring there.
+A **pipeline** is a Temporal workflow that consumes a project and produces a
+run. Catalog lives in `src/adforge/pipelines/__init__.py` (`PIPELINES` registry
+with id / glyph / tagline / needs / produces / configs). The CLI, API, and UI
+all read from it.
 
-A **pipeline** is a Temporal workflow that consumes a target and produces a run.
-The catalog lives in `src/adforge/pipelines/__init__.py` (PIPELINES list with
-id / glyph / tagline / needs / produces). The CLI, API, and UI all read from it.
-
-A **run** is one pipeline execution against one target. The folder is
-`runs/<run_id>/` and always contains a `manifest.json` (the single record the
-CLI / API / UI all read).
+A **run** is one pipeline execution against one project, captured at
+`runs/<run_id>/` with `manifest.json` describing what was produced. The CLI,
+API, and UI all read manifests.
 
 ```
-targets/<id>/  ──[ pipeline ]──>  runs/<run_id>/
+projects/<id>/  ──[ pipeline + config ]──>  runs/<run_id>/
 ```
 
-`run_id` is `YYYYMMDD-HHMMSS__<pipeline>__<target_id>` — sortable, greppable,
-and reused as the Temporal `workflow_id` so the UI's "View in Temporal" link
-just works.
-
-## How it runs
-
-1. `temporal server start-dev` runs the orchestrator (single binary, no infra).
-2. `uv run adforge worker` runs a long-lived worker that hosts every activity + workflow.
-3. `uv run adforge run <pipeline> --target <id>` starts a workflow execution.
-4. The Temporal Web UI at <http://localhost:8233> shows runs, retries, durations.
+`run_id` = `YYYYMMDD-HHMMSS__<pipeline>__<project_id>`. Sortable, greppable,
+and reused as the Temporal `workflow_id` (deep-link from the UI works).
 
 ## src/adforge top-down
 
 ```
-config.py             env + path constants (TARGETS_DIR, RUNS_DIR, CACHE_DIR)
-targets.py            load a target id → resolved Target (paths + metadata)
+config.py             env + path constants (PROJECTS_DIR, RUNS_DIR, CACHE_DIR)
+projects.py           load a project id → resolved Project (paths + metadata)
 runs.py               make_run_id, run_dir, list_runs
-utils.py              small helpers (slug, data-url, size guards)
+utils.py              small helpers
 connectors/           plain-Python clients: gemini, claude, mistral, sensortower, scenario
-activities/           Temporal activities (atomic, retryable, composable units)
-  finalize.py         finalize_run — last step of every workflow, writes manifest.json
-pipelines/            Temporal workflows: creative_forge, playable_forge, full_forge
-  __init__.py         PIPELINES registry — single source of truth (CLI/API/UI all read it)
-templates/            playable_template.html + examples/ (in-context references for the LLM)
+activities/           Temporal activities (atomic, retryable)
+  finalize.py         finalize_run — writes manifest.json (with project_id, config_id)
+pipelines/            Temporal workflows
+  __init__.py         PIPELINES + CONFIGS registry — single source of truth
+  creative_forge.py   the video-ad pipeline
+  playable_forge.py   the playable pipeline
+templates/            playable_template.html + examples/ (in-context refs for the LLM)
 worker.py             Temporal worker entrypoint
-api.py                FastAPI shim that powers the ui/ viewer
-cli.py                typer CLI: `adforge worker`, `adforge api`, `adforge run …`, `adforge tools …`
+api.py                FastAPI shim (powers ui/)
+cli.py                typer CLI
 ```
 
-Read top-to-bottom: by the time you hit `pipelines/`, every dependency has been introduced.
+## How to iterate on a pipeline
 
-## Naming convention
+The fast loop:
 
-We don't say "Track 2" / "Track 3" anywhere in code. The pipelines are named for
-what they *do*:
+1. Add a new `PipelineConfig` entry in `pipelines/__init__.py` for the
+   pipeline you're tuning (e.g. `claude-prose-brief` for `creative_forge`).
+2. Branch in the relevant activity on `inp.config_id` to swap behavior.
+3. `uv run adforge run creative --project castle_clashers --config claude-prose-brief`
+4. Compare runs side-by-side in the UI — config_id is on every row.
 
-| Voodoo track | adforge pipeline | Input → Output |
-|---|---|---|
-| Track 3 (market intel) | `creative_forge` | target → brief + Scenario prompt + (optional) image |
-| Track 2 (playable ads) | `playable_forge` | target (with video + assets) → single-file HTML playable + variants |
-| Both, merged demo      | `full_forge`     | target (with video + assets) → everything above, market-informed |
+Old runs stay reproducible because the manifest captures the `config_id`.
 
-## How we work with Claude (Spec → Plan → Build)
+## How it runs
 
-Use three conversations for non-trivial features:
-1. **Spec** (Opus) — describe the goal, no code. Output: `docs/<feature>-spec.md`.
-2. **Plan** (Opus) — feed spec + relevant source. Output: `docs/<feature>-plan.md`.
-3. **Build** (Sonnet) — feed only the plan. Implement one task at a time.
+1. `temporal server start-dev` — orchestrator (single binary).
+2. `uv run adforge worker` — long-lived worker hosting activities + workflows.
+3. `uv run adforge api` — FastAPI shim, powers the UI.
+4. `cd ui && npm run dev` — Vite dev server.
+5. `uv run adforge run <pipeline> --project <id> [--config <id>]` — kick off a run.
 
-Skip for trivial fixes, clear-repro bugs, exploratory prototypes.
+Temporal Web UI at <http://localhost:8233> for raw orchestration.
+adforge UI at <http://localhost:5173> for the friendly product view.
 
 ## Conventions
 
-- **Single-file HTML deliverables** for `playable_forge`. No CDNs, no external scripts. All assets inlined as base64 (or generated at runtime).
-- **Size budget:** ≤ 5 MB. The activity prints size after every build; CI guard via `assert_under_size`.
-- **CONFIG block at top** of every playable so variations are a 30-second edit.
+- **Single-file HTML deliverables** for `playable_forge`. No CDNs, no external
+  scripts. All assets inlined as base64 (or generated at runtime).
+- **5 MB size budget** — `assert_under_size` guards every build.
+- **CONFIG block at top** of every playable so variants are a 30-second edit.
 - **Mobile-first.** Touch input, viewport meta, no hover.
-- **Variations are part of the deliverable** — not an afterthought. `full_forge` makes them *market-hypothesis* variants (each tests a top-ranked hook / palette).
-- **Reproducibility** — every run lands in `runs/<run_id>/` with a `manifest.json` that records the params used. Re-running with the same params still gets a new `run_id` (no clobbering).
-- **Cached SensorTower** — `.cache/sensortower/` deduplicates calls. Bust by `rm -rf .cache/sensortower`.
+- **Reproducibility** — every run captures its `params` + `config_id` in
+  manifest.json. New `run_id` per execution, no clobbering.
+- **Cached SensorTower** — `.cache/sensortower/`. Bust by `rm -rf .cache/sensortower`.
 
 ## Don't do this
 
 - Don't commit `.env` (gitignored).
 - Don't load remote scripts/fonts in playables — ad networks reject them.
-- Don't recreate the full game. Pick the smallest fun loop and ship it.
-- Don't bypass Temporal in workflows by doing IO directly — call activities.
-- Don't add a `requirements.txt` — uv owns deps via `pyproject.toml`.
-- Don't hard-code paths to `targets/` or `runs/` — import `TARGETS_DIR` / `RUNS_DIR` from `config.py`, or use `targets.load()` / `runs.make_run_id()`.
+- Don't recreate the full game. Smallest fun loop wins.
+- Don't bypass Temporal in workflows. Call activities for IO.
+- Don't add `requirements.txt` — uv owns deps via `pyproject.toml`.
+- Don't hard-code paths to `projects/` or `runs/`. Import `PROJECTS_DIR` /
+  `RUNS_DIR` from `config.py`, or use `projects.load()` / `runs.make_run_id()`.
 
 ## Quick commands
 
 ```bash
-# install / sync deps
 uv sync
-
-# start Temporal locally (separate terminal)
-temporal server start-dev   # http://localhost:8233 web UI
-
-# run the worker (separate terminal)
+temporal server start-dev
 uv run adforge worker
+uv run adforge api
+cd ui && npm run dev
 
-# inspect targets and runs
-uv run adforge tools targets                   # list targets
-uv run adforge tools targets castle_clashers   # show one target
-uv run adforge tools runs                      # list runs
-uv run adforge tools runs <run_id>             # show one manifest
+uv run adforge tools projects
+uv run adforge tools projects castle_clashers
+uv run adforge tools pipelines
+uv run adforge tools runs
 
-# run pipelines (target metadata auto-fills category/country/etc; flags are just overrides)
-uv run adforge run creative --target castle_clashers
-uv run adforge run playable --target castle_clashers
-uv run adforge run full     --target castle_clashers
-
-# UI (optional but it's how the demo lands)
-uv run adforge api           # FastAPI shim, http://127.0.0.1:8765
-cd ui && npm run dev         # Vite, http://localhost:5173
-
-# standalone helpers (no Temporal needed)
-uv run adforge tools env
-uv run adforge tools st-search "royal match"
-uv run adforge tools st-top-creatives --network TikTok --save /tmp/top.json
-uv run adforge tools inline runs/<run_id>/playable.html
+uv run adforge run creative --project castle_clashers
+uv run adforge run playable --project castle_clashers --config default
 ```
 
 ## Useful links

@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 
 const TONES = {
-  default:   "border-[var(--color-line-2)] text-[var(--color-text-2)]",
-  forge:     "border-[var(--color-forge)] text-[var(--color-forge)]",
-  emerald:   "border-[var(--color-emerald)] text-[var(--color-emerald)]",
-  rust:      "border-[var(--color-rust)] text-[var(--color-rust)]",
-  saffron:   "border-[var(--color-saffron)] text-[var(--color-saffron)]",
-  muted:     "border-[var(--color-line)] text-[var(--color-muted)]",
+  default:   "border-[var(--color-line-2)] text-[var(--color-text-2)] bg-transparent",
+  forge:     "border-[var(--color-forge)]/60 text-[var(--color-forge)] bg-[var(--color-forge)]/10",
+  emerald:   "border-[var(--color-emerald)]/60 text-[var(--color-emerald)] bg-[var(--color-emerald)]/10",
+  rust:      "border-[var(--color-rust)]/60 text-[var(--color-rust)] bg-[var(--color-rust)]/10",
+  saffron:   "border-[var(--color-saffron)]/60 text-[var(--color-saffron)] bg-[var(--color-saffron)]/10",
+  muted:     "border-[var(--color-line)] text-[var(--color-muted)] bg-transparent",
 } as const;
 
 export function Pill({
@@ -20,7 +20,7 @@ export function Pill({
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-1.5 border px-2 py-[2px] text-[10.5px] uppercase tracking-[0.12em] ${TONES[tone]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-[11.5px] ${TONES[tone]} ${className}`}
     >
       {children}
     </span>

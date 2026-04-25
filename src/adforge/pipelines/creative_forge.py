@@ -1,16 +1,18 @@
-"""creative_forge — Temporal workflow: target game → ad creative + brief.
+"""creative_forge — the video-ad pipeline.
 
-Steps:
-  1. resolve_target_game     — search SensorTower, get unified app ID
+Project (game) in. Video creative out. Steps today (will evolve as we iterate
+under different configs — see PIPELINES registry):
+
+  1. resolve_target_game     — search SensorTower for the unified app id
   2. fetch_market_data       — top advertisers + top creatives in the genre
   3. extract_patterns        — Mistral/Gemini labels each creative on a vocab
   4. write_brief_and_prompt  — markdown brief + Scenario-ready prompt
-  5. (optional) render_scenario_creative — headless image gen via Scenario HTTP API
-                              (skipped by default — preferred path is the Scenario MCP
-                              inside Claude Code)
+  5. (optional) render_scenario_creative — headless image via Scenario HTTP API
   6. finalize_run            — write manifest.json
 
-Input: CreativeForgeInput. Output: CreativeForgeResult.
+Future iterations (per config preset): swap labelers/brief writers, add a web
+research step, generate storyboards, swap in a video model. The activities are
+the unit of swap; the workflow stays simple.
 """
 
 from __future__ import annotations
@@ -38,10 +40,11 @@ with workflow.unsafe.imports_passed_through():
 
 
 class CreativeForgeInput(BaseModel):
-    target_id: str                       # for manifest provenance
+    project_id: str                      # for manifest provenance
     run_id: str
     run_dir: str                         # absolute path to runs/<run_id>/
     target_term: str                     # display name / search term, e.g. "Castle Clashers"
+    config_id: str = "default"           # which PipelineConfig preset to apply
     category: str | int = 7012
     country: str = "US"
     network: str = "TikTok"
@@ -143,7 +146,8 @@ class CreativeForge:
                 run_dir=inp.run_dir,
                 run_id=inp.run_id,
                 pipeline="creative_forge",
-                target_id=inp.target_id,
+                project_id=inp.project_id,
+                config_id=inp.config_id,
                 started_at=started_at,
                 params=inp.model_dump(),
                 artifact_globs=["*.json", "*.md", "*.txt", "*.png", "*.jpg"],

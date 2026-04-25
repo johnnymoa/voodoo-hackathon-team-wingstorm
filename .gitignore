@@ -50,13 +50,13 @@ Thumbs.db
 .claude/.credentials/
 .claude/projects/
 
-# targets/ — gameplay videos are large; commit metadata + assets, never videos
-targets/**/video.mp4
-targets/**/video.mov
-targets/**/video.webm
-targets/**/video.gif
-targets/**/raw/
-targets/**/scenario_downloads/
+# projects/ — gameplay videos are large; commit metadata + assets, never videos
+projects/**/video.mp4
+projects/**/video.mov
+projects/**/video.webm
+projects/**/video.gif
+projects/**/raw/
+projects/**/scenario_downloads/
 
 # runs/ — every pipeline execution. Keep the dir, drop the contents.
 runs/*
