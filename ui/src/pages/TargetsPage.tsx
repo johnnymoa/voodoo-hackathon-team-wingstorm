@@ -58,20 +58,39 @@ function TargetCard({ t }: { t: Target }) {
           <h3 className="mt-1 font-display italic text-[24px] leading-tight tracking-[-0.01em] text-[var(--color-text)]">
             {t.name}
           </h3>
-          <div className="mt-1 font-mono text-[11.5px] text-[var(--color-faint)]">{t.id}</div>
+          <div className="mt-1 flex items-center gap-2 font-mono text-[11.5px] text-[var(--color-faint)]">
+            <span>{t.id}</span>
+            {t.genre && (
+              <>
+                <span className="text-[var(--color-line-2)]">·</span>
+                <span className="text-[var(--color-text-2)]">{t.genre}</span>
+              </>
+            )}
+          </div>
         </div>
         <div className="shrink-0 text-[var(--color-forge)] text-[28px] font-display italic leading-none opacity-30 group-hover:opacity-90 transition-opacity">
           §
         </div>
       </div>
 
-      {t.notes && (
+      {t.description && (
+        <p className="mt-4 border-l-2 border-[var(--color-forge)]/60 pl-3 text-[12.5px] leading-relaxed text-[var(--color-text-2)]">
+          {t.description}
+        </p>
+      )}
+
+      {!t.description && t.notes && (
         <p className="mt-4 border-l-2 border-[var(--color-line-2)] pl-3 text-[12px] leading-relaxed text-[var(--color-text-2)]">
           {t.notes}
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--color-line)] pt-4 text-[10.5px] uppercase tracking-[0.14em]">
+        <Stat label="category" value={t.category_id ?? "—"} />
+        <Stat label="country"  value={t.country ?? "—"} />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Pill tone={t.has_video ? "emerald" : "muted"}>
           {t.has_video ? "✓" : "—"} video
         </Pill>
@@ -86,6 +105,15 @@ function TargetCard({ t }: { t: Target }) {
         <CopyCmd cmd={`uv run adforge run full --target ${t.id}`}     label="full"     enabled={t.has_video} />
       </div>
     </article>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[9.5px] text-[var(--color-muted)]">{label}</div>
+      <div className="mt-0.5 font-mono normal-case tracking-normal text-[11.5px] text-[var(--color-text)]">{value}</div>
+    </div>
   );
 }
 

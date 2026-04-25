@@ -2,9 +2,9 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 
 const NAV = [
-  { to: "/runs",      label: "Runs",      glyph: "01" },
-  { to: "/targets",   label: "Targets",   glyph: "02" },
-  { to: "/reference", label: "Reference", glyph: "03" },
+  { to: "/targets",   label: "Targets",   glyph: "01" },
+  { to: "/pipelines", label: "Pipelines", glyph: "02" },
+  { to: "/runs",      label: "Runs",      glyph: "03" },
 ];
 
 export function Layout() {
@@ -15,13 +15,13 @@ export function Layout() {
       <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-[color:var(--color-canvas)]/85 backdrop-blur-sm">
         <div className="mx-auto flex max-w-[1320px] items-center gap-6 px-6 h-12">
           <NavLink
-            to="/runs"
+            to="/"
             className="font-display italic text-[20px] leading-none tracking-[-0.02em] text-[var(--color-text)] hover:text-[var(--color-forge)] transition-colors"
           >
             adforge
           </NavLink>
           <span className="text-[10.5px] uppercase tracking-[0.16em] text-[var(--color-muted)]">
-            engineering log
+            target → pipeline → run
           </span>
 
           <nav className="ml-auto flex items-center gap-1">

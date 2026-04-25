@@ -34,9 +34,24 @@ export interface RunManifest {
 export interface Target {
   id: string;
   name: string;
+  genre?: string | null;
+  description?: string | null;
+  category_id?: string;
+  country?: string;
   has_video: boolean;
   has_assets: boolean;
   notes?: string | null;
+}
+
+export interface Pipeline {
+  id: string;                                  // "creative_forge" | "playable_forge" | "full_forge" | …
+  name: string;
+  glyph: string;
+  tagline: string;
+  track: "track-2" | "track-3" | "merged";
+  needs: string[];                             // e.g. ["video"]
+  produces: string[];
+  cli: string;
 }
 
 export interface TargetDetail {
@@ -58,6 +73,7 @@ async function jget<T>(url: string): Promise<T> {
 
 export const api = {
   health:     () => jget<{ status: string }>("/api/health"),
+  pipelines:  () => jget<Pipeline[]>("/api/pipelines"),
   targets:    () => jget<Target[]>("/api/targets"),
   target:     (id: string) => jget<TargetDetail>(`/api/targets/${encodeURIComponent(id)}`),
   runs:       () => jget<RunSummary[]>("/api/runs"),

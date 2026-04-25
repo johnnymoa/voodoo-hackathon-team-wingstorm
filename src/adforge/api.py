@@ -26,6 +26,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 
 from adforge import targets as targets_mod
 from adforge.config import RUNS_DIR
+from adforge.pipelines import PIPELINES
 from adforge.runs import list_runs
 
 app = FastAPI(title="adforge api", version="0.1.0")
@@ -62,6 +63,11 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/pipelines")
+def api_pipelines() -> list[dict[str, Any]]:
+    return [p.model_dump() for p in PIPELINES]
+
+
 @app.get("/api/targets")
 def api_targets() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
@@ -69,8 +75,14 @@ def api_targets() -> list[dict[str, Any]]:
         try:
             t = targets_mod.load(tid)
             out.append({
-                "id": t.id, "name": t.name,
-                "has_video": t.has_video(), "has_assets": t.has_assets(),
+                "id": t.id,
+                "name": t.name,
+                "genre": t.genre,
+                "description": t.description,
+                "category_id": t.category_id,
+                "country": t.country,
+                "has_video": t.has_video(),
+                "has_assets": t.has_assets(),
                 "notes": t.notes,
             })
         except Exception as e:

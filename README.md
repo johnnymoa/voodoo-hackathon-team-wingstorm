@@ -1,116 +1,105 @@
 # adforge
 
-AI ad pipelines for mobile games. Two composable Temporal workflows — and one that chains them.
+> A single forge for ad assets.
 
-- **`creative_forge`** — target game → market-informed brief + Scenario prompt
-- **`playable_forge`** — gameplay video → single-file HTML playable + variants
-- **`full_forge`** — target + video → both, where the playable is informed by the market patterns
+You define a **target** (everything you know about a game). You pick a
+**pipeline** (a recipe). You get a **run** (a self-describing folder of
+artifacts).
 
-Built for VoodooHack (Paris, Apr 26–27 2026), tracks 2 and 3.
+```
+   TARGET ──────────►   PIPELINE  ──────────►   RUN
+   (a game)             (a recipe)              (an output)
+
+   targets/<id>/                                runs/<id>/
+   ├ target.json        creative_forge ──┐      ├ manifest.json
+   ├ video.mp4          playable_forge ──┤───►  ├ brief.md
+   ├ assets/            full_forge       ──┘    ├ playable.html
+   └ description, …                             └ patterns.json
+```
+
+Built for VoodooHack (Paris, Apr 26–27 2026). Track 3 is `creative_forge`.
+Track 2 is `playable_forge`. The demo win is `full_forge` — the only pipeline
+where the playable is *informed* by what's winning in market right now.
 
 ## Top-down layout
 
 ```
 adforge/
-├── targets/                   ← INPUTS. One folder per game. See targets/README.md.
-│   └── <target_id>/
-│       ├── target.json        required — name, app_id, store_urls
-│       ├── video.mp4          optional — gameplay video (gitignored)
-│       ├── assets/            optional — images / audio for playables
-│       └── README.md          optional — human notes
-│
-├── runs/                      ← OUTPUTS. One folder per execution. See runs/README.md.
-│   └── <run_id>/
-│       ├── manifest.json      who/what/when/status/artifacts
-│       └── ...                pipeline-specific files
-│
-├── reference/                 ← STUDY MATERIAL. Canonical playables to learn from.
-│   ├── MarbleSort.html
-│   └── CupHeroes.html
-│
-├── src/adforge/               ← THE FORGE.
-│   ├── config.py              env + path constants (TARGETS_DIR, RUNS_DIR, …)
-│   ├── targets.py             load a target by id → resolved paths
-│   ├── runs.py                make_run_id, run_dir helpers
-│   ├── connectors/            composable: gemini, claude, mistral, sensortower, scenario
-│   ├── activities/            composable: Temporal activities (atomic, retryable)
-│   ├── pipelines/             workflows: creative_forge, playable_forge, full_forge
-│   ├── templates/             playable_template.html
-│   ├── worker.py              Temporal worker entrypoint
-│   ├── api.py                 FastAPI shim that powers the UI
-│   └── cli.py                 `adforge` CLI surface (worker / run / api / tools)
-│
-├── ui/                        ← VIEWER. Vite + React + Tailwind. Reads runs/ via api.py.
-│
-├── docs/                      design notes, briefs, API reference
-├── .env / .env.example        secrets
-└── pyproject.toml             uv project manifest
+├── targets/                INPUTS.   one folder per game (target.json + optional video.mp4 + assets/)
+├── runs/                   OUTPUTS.  one folder per execution (manifest.json + artifacts)
+├── src/adforge/            FORGE.    code, top-down: config → connectors → activities → pipelines → cli + api
+├── ui/                     VIEWER.   Vite + React + Tailwind. Reads runs/ + targets/ via api.py.
+├── docs/                   notes
+├── .env / .env.example     secrets
+└── pyproject.toml          uv project manifest
 ```
 
-The four top-level directories map 1:1 to four ideas:
-
-- **targets/** = what you can run *against*
-- **runs/** = what has been run
-- **reference/** = what "good" looks like
-- **src/adforge/** = the forge itself, top-down by layer
+Three top-level data buckets, one idea each. There used to be a `reference/`
+folder for example playables — those moved into `src/adforge/templates/examples/`
+where the playable build activity uses them as in-context.
 
 ## Setup
 
-Prereqs: `uv`, `temporal` CLI, Python 3.11+.
-
 ```bash
-uv sync                          # install deps from pyproject.toml
-cp .env.example .env             # then fill in keys
+uv sync                          # python deps
+cp .env.example .env             # fill in keys
 brew install temporal            # macOS — or: curl -sSf https://temporal.download/cli.sh | sh
 ```
 
 ## Run
 
-Three terminals.
+You'll want five terminals (each is a long-lived process; only the last one is per-run).
 
 ```bash
-# terminal 1 — Temporal local dev server (single binary, web UI on :8233)
+# 1) Temporal local dev server          → http://localhost:8233
 temporal server start-dev
 
-# terminal 2 — long-lived worker hosting all activities + workflows
+# 2) adforge worker (hosts activities + workflows)
 uv run adforge worker
 
-# terminal 3 — kick off a workflow against a target
+# 3) FastAPI shim that powers the UI    → http://127.0.0.1:8765
+uv run adforge api
+
+# 4) Vite dev server                    → http://localhost:5173
+cd ui && npm install && npm run dev
+
+# 5) kick off a workflow against a target
 uv run adforge run creative --target castle_clashers
 uv run adforge run playable --target castle_clashers
 uv run adforge run full     --target castle_clashers
 ```
 
-The Temporal Web UI at <http://localhost:8233> shows every activity, retry, and timing.
-The artifacts land in `runs/<run_id>/`.
+Open <http://localhost:5173> for the **engineering log book** view of the forge.
+Open <http://localhost:8233> for the raw **orchestration debugger**. Every run
+is deep-linked between the two via its `run_id` (also the Temporal `workflow_id`).
 
-## Browse runs in the UI
+## What a target looks like
 
-A read-only Vite/React viewer lives at `ui/`. It reads `runs/` and `targets/`
-via the FastAPI shim in `src/adforge/api.py` and embeds playables in iframes,
-renders briefs as markdown, and links each run to its Temporal workflow page.
+`target.json` is the kitchen-sink for everything known about a game.
+The pipelines auto-pull `category_id`, `country`, `description`, `name` from it
+— nothing has to be re-entered on the CLI.
 
-```bash
-# terminal 4 — FastAPI shim (reads runs/ + targets/)
-uv run adforge api                 # http://127.0.0.1:8765
-
-# terminal 5 — Vite dev server (proxies /api → 8765)
-cd ui && npm install && npm run dev   # http://localhost:5173
+```json
+{
+  "name":        "Castle Clashers",
+  "genre":       "tower-defense / clash hybrid",
+  "description": "Tap-to-defend tower-defense hybrid where players defend their castle...",
+  "category_id": "7012",
+  "country":     "US",
+  "app_id":      null,
+  "store_urls":  { "ios": "...", "android": "..." },
+  "notes":       "Hackathon Track 2 reference kit."
+}
 ```
-
-Three views: `/runs` (engineering log of every execution), `/runs/:id` (manifest
-+ artifact viewer), `/targets` (input bundles, with copy-paste run commands).
 
 ## Adding a new target
 
 ```bash
 mkdir -p targets/royal_match
-cat > targets/royal_match/target.json <<'EOF'
-{ "name": "Royal Match", "app_id": null, "store_urls": {}, "notes": "" }
-EOF
-# (drop video.mp4 + assets/ alongside if you want to run playable / full)
+$EDITOR targets/royal_match/target.json    # at minimum: { "name": "Royal Match" }
+# drop video.mp4 + assets/ alongside if you want to run playable / full
 
-uv run adforge tools targets             # confirm it shows up
+uv run adforge tools targets               # confirm it shows up
 uv run adforge run creative --target royal_match
 ```
 
@@ -121,7 +110,7 @@ uv run adforge tools env                              # resolved settings
 uv run adforge tools targets                          # list targets
 uv run adforge tools targets castle_clashers         # show one target's details
 uv run adforge tools runs                             # list runs
-uv run adforge tools runs <run_id>                   # show one run's manifest
+uv run adforge tools runs <run_id>                   # show one manifest
 uv run adforge tools st-search "royal match"          # SensorTower search
 uv run adforge tools st-top-creatives --network TikTok
 uv run adforge tools inline runs/<run_id>/playable.html

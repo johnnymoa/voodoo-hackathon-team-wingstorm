@@ -1,6 +1,6 @@
 # adforge — Voodoo Hack pipelines
 
-Two composable Temporal pipelines for mobile-game ad generation, plus one that chains them:
+> A single forge for ad assets. **target → pipeline → run.**
 
 - **`creative_forge`** — target game → market-informed brief + Scenario prompt
 - **`playable_forge`** — gameplay video → interactive HTML playable + variants
@@ -8,31 +8,43 @@ Two composable Temporal pipelines for mobile-game ad generation, plus one that c
 
 ## Top-down layout
 
-The repo root maps four directories to four ideas:
+The repo root maps three top-level data dirs + the code dir to four ideas:
 
 ```
-targets/                INPUTS.   One folder per game. target.json + optional video.mp4 + assets/
-runs/                   OUTPUTS.  One folder per execution. manifest.json + artifacts.
-reference/              STUDY.    Canonical playables to learn from (NOT generated, NOT consumed).
-src/adforge/            FORGE.    The code. Top-down: config → connectors → activities → pipelines → cli.
+targets/                INPUTS.   one folder per game (target.json + optional video.mp4 + assets/)
+runs/                   OUTPUTS.  one folder per execution (manifest.json + artifacts)
+src/adforge/            FORGE.    code, top-down: config → connectors → activities → pipelines → cli + api
+ui/                     VIEWER.   Vite + React + Tailwind. Reads runs/ + targets/ via api.py.
 ```
 
 Plus `docs/`, `.env*`, `.mcp.json`, `pyproject.toml` at the root for setup/config.
 
-## Mental model: target → run
+There used to be a `reference/` folder with example playables. That was dead
+weight — the examples now live in `src/adforge/templates/examples/` where the
+playable-build activity uses them as in-context references.
 
-A **target** is a named bundle of inputs (game name, optional video, optional assets).
-A **run** is one pipeline execution against a target. Everything else is plumbing.
+## Mental model: target → pipeline → run
+
+A **target** is the kitchen-sink folder for everything we know about a game:
+display name, genre, description, store category, optional gameplay video,
+optional asset kit. The schema lives in `src/adforge/targets.py` (Target model)
+and is documented in the docstring there.
+
+A **pipeline** is a Temporal workflow that consumes a target and produces a run.
+The catalog lives in `src/adforge/pipelines/__init__.py` (PIPELINES list with
+id / glyph / tagline / needs / produces). The CLI, API, and UI all read from it.
+
+A **run** is one pipeline execution against one target. The folder is
+`runs/<run_id>/` and always contains a `manifest.json` (the single record the
+CLI / API / UI all read).
 
 ```
 targets/<id>/  ──[ pipeline ]──>  runs/<run_id>/
 ```
 
 `run_id` is `YYYYMMDD-HHMMSS__<pipeline>__<target_id>` — sortable, greppable,
-also used as the Temporal workflow_id so you can deep-link to the orchestration view.
-
-Every run folder has a `manifest.json` with status + artifacts. That's the
-single record the CLI / future UI / any tool reads.
+and reused as the Temporal `workflow_id` so the UI's "View in Temporal" link
+just works.
 
 ## How it runs
 
@@ -44,7 +56,7 @@ single record the CLI / future UI / any tool reads.
 ## src/adforge top-down
 
 ```
-config.py             env + path constants (TARGETS_DIR, RUNS_DIR, REFERENCE_DIR, CACHE_DIR)
+config.py             env + path constants (TARGETS_DIR, RUNS_DIR, CACHE_DIR)
 targets.py            load a target id → resolved Target (paths + metadata)
 runs.py               make_run_id, run_dir, list_runs
 utils.py              small helpers (slug, data-url, size guards)
@@ -52,9 +64,11 @@ connectors/           plain-Python clients: gemini, claude, mistral, sensortower
 activities/           Temporal activities (atomic, retryable, composable units)
   finalize.py         finalize_run — last step of every workflow, writes manifest.json
 pipelines/            Temporal workflows: creative_forge, playable_forge, full_forge
-templates/            playable_template.html (CONFIG-block driven)
+  __init__.py         PIPELINES registry — single source of truth (CLI/API/UI all read it)
+templates/            playable_template.html + examples/ (in-context references for the LLM)
 worker.py             Temporal worker entrypoint
-cli.py                typer CLI: `adforge worker`, `adforge run …`, `adforge tools …`
+api.py                FastAPI shim that powers the ui/ viewer
+cli.py                typer CLI: `adforge worker`, `adforge api`, `adforge run …`, `adforge tools …`
 ```
 
 Read top-to-bottom: by the time you hit `pipelines/`, every dependency has been introduced.
@@ -116,10 +130,14 @@ uv run adforge tools targets castle_clashers   # show one target
 uv run adforge tools runs                      # list runs
 uv run adforge tools runs <run_id>             # show one manifest
 
-# run pipelines
+# run pipelines (target metadata auto-fills category/country/etc; flags are just overrides)
 uv run adforge run creative --target castle_clashers
 uv run adforge run playable --target castle_clashers
 uv run adforge run full     --target castle_clashers
+
+# UI (optional but it's how the demo lands)
+uv run adforge api           # FastAPI shim, http://127.0.0.1:8765
+cd ui && npm run dev         # Vite, http://localhost:5173
 
 # standalone helpers (no Temporal needed)
 uv run adforge tools env

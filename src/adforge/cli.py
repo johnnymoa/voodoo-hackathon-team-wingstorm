@@ -124,8 +124,8 @@ def run_playable(
 @run.command("creative")
 def run_creative(
     target: str = typer.Option(..., "--target", help="Target id (folder under targets/)"),
-    category: str = typer.Option("7012", "--category"),
-    country: str = typer.Option("US", "--country"),
+    category: Optional[str] = typer.Option(None, "--category", help="Override target.category_id"),
+    country: Optional[str] = typer.Option(None, "--country",   help="Override target.country"),
     network: str = typer.Option("TikTok", "--network"),
     period: str = typer.Option("month", "--period"),
     sample: int = typer.Option(30, "--sample"),
@@ -141,7 +141,9 @@ def run_creative(
     inp = CreativeForgeInput(
         target_id=t.id, run_id=rid, run_dir=run_dir,
         target_term=t.name,
-        category=category, country=country, network=network, period=period,
+        category=category or t.category_id,
+        country=country or t.country,
+        network=network, period=period,
         sample=sample, render_with_scenario_http=render_http,
     )
     asyncio.run(_start_workflow("creative_forge", inp, workflow_id=rid))
@@ -150,8 +152,8 @@ def run_creative(
 @run.command("full")
 def run_full(
     target: str = typer.Option(..., "--target", help="Target id (folder under targets/)"),
-    category: str = typer.Option("7012", "--category"),
-    country: str = typer.Option("US", "--country"),
+    category: Optional[str] = typer.Option(None, "--category", help="Override target.category_id"),
+    country: Optional[str] = typer.Option(None, "--country",   help="Override target.country"),
     network: str = typer.Option("TikTok", "--network"),
     period: str = typer.Option("month", "--period"),
     sample: int = typer.Option(30, "--sample"),
@@ -171,7 +173,9 @@ def run_full(
     inp = FullForgeInput(
         target_id=t.id, run_id=rid, run_dir=run_dir,
         target_term=t.name, video_path=t.video_path, asset_dir=t.asset_dir,
-        category=category, country=country, network=network, period=period,
+        category=category or t.category_id,
+        country=country or t.country,
+        network=network, period=period,
         sample=sample, render_with_scenario_http=render_http,
     )
     asyncio.run(_start_workflow("full_forge", inp, workflow_id=rid))
