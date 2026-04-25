@@ -15,10 +15,17 @@ from adforge.connectors import sensortower as st
 
 @activity.defn(name="resolve_target_game")
 async def resolve_target_game(inp: TargetGameInput) -> TargetGame:
+    """Search SensorTower for the unified app id.
+
+    Fictional / unreleased games won't match — return a synthetic target so the
+    rest of the pipeline (market data by category, brief, Scenario prompt) can
+    still run. Downstream activities don't depend on app_id.
+    """
     res = st.search_entities(inp.term, os_="unified", entity_type="app", limit=5)
-    apps = res.get("apps") or res.get("results") or []
+    apps = res if isinstance(res, list) else (res.get("apps") or res.get("results") or [])
     if not apps:
-        raise RuntimeError(f"No app found for '{inp.term}'")
+        activity.logger.info("no SensorTower match for %r — using synthetic target", inp.term)
+        return TargetGame(app_id="", name=inp.term, publisher_name=None, raw={"synthetic": True, "term": inp.term})
     a = apps[0]
     return TargetGame(
         app_id=str(a.get("app_id") or a.get("id") or ""),

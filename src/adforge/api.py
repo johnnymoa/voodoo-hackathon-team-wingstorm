@@ -22,18 +22,21 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
+from pydantic import BaseModel
 
+from adforge import feedback as feedback_mod
 from adforge import projects as projects_mod
 from adforge.config import RUNS_DIR
 from adforge.pipelines import PIPELINES
+from adforge.runner import StartRunError, start_run
 from adforge.runs import list_runs
 
-app = FastAPI(title="adforge api", version="0.2.0")
+app = FastAPI(title="adforge api", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -137,12 +140,69 @@ def api_runs() -> list[dict[str, Any]]:
     return [_summarize_manifest(rid, _read_manifest(rid)) for rid in list_runs()]
 
 
+class StartRunBody(BaseModel):
+    pipeline_id: str
+    project_id: str
+    config_id: str = "default"
+
+
+@app.post("/api/runs")
+async def api_start_run(body: StartRunBody) -> dict[str, Any]:
+    """Kick off a Temporal workflow. Returns the new run_id; does not await result."""
+    try:
+        return await start_run(body.pipeline_id, body.project_id, body.config_id)
+    except StartRunError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"failed to start workflow: {e}")
+
+
 @app.get("/api/runs/{run_id}")
 def api_run(run_id: str) -> dict[str, Any]:
     m = _read_manifest(run_id)
     if m is None:
         raise HTTPException(status_code=404, detail=f"no manifest for {run_id}")
     return m
+
+
+class SaveFeedbackBody(BaseModel):
+    body: str
+    status: str | None = None
+
+
+@app.get("/api/runs/{run_id}/feedback")
+def api_get_feedback(run_id: str) -> dict[str, Any]:
+    fb = feedback_mod.load(run_id)
+    if fb is None:
+        # Return a synthetic empty record so the UI can show the editor
+        # without first having to handle 404s.
+        return {
+            "run_id": run_id,
+            "status": "open",
+            "created_at": None,
+            "updated_at": None,
+            "addressed_in_run": None,
+            "addressed_by_config": None,
+            "body": "",
+            "exists": False,
+        }
+    return {**fb.model_dump(), "exists": True}
+
+
+@app.post("/api/runs/{run_id}/feedback")
+def api_save_feedback(run_id: str, body: SaveFeedbackBody) -> dict[str, Any]:
+    if not (RUNS_DIR / run_id).is_dir():
+        raise HTTPException(status_code=404, detail=f"no run dir for {run_id}")
+    try:
+        fb = feedback_mod.save(run_id, body.body, status=body.status)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {**fb.model_dump(), "exists": True}
+
+
+@app.get("/api/feedback")
+def api_list_feedback(status: str | None = None) -> list[dict[str, Any]]:
+    return [fb.model_dump() for fb in feedback_mod.list_all(status=status)]
 
 
 @app.get("/api/runs/{run_id}/text/{rel:path}", response_class=PlainTextResponse)

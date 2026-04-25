@@ -1,4 +1,5 @@
-"""Sensor Tower connector — wraps the validated endpoints in docs/sensortower_api.md.
+"""Sensor Tower connector — wraps the validated endpoints documented in
+.claude/skills/sensortower-research/REFERENCE.md.
 
 All responses are cached to .cache/sensortower/ keyed by (url, params). Re-running
 is free; delete the cache dir to bust.

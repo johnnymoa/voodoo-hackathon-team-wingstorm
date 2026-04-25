@@ -20,6 +20,7 @@ import typer
 from rich import print as rprint
 from rich.table import Table
 
+from adforge import feedback as feedback_mod
 from adforge import projects as projects_mod
 from adforge import worker as worker_mod
 from adforge.activities.types import VariationSpec
@@ -30,8 +31,10 @@ from adforge.runs import ensure_run_dir, list_runs, make_run_id
 app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode="rich")
 run = typer.Typer(no_args_is_help=True, help="Launch Temporal workflows against a project.")
 tools = typer.Typer(no_args_is_help=True, help="Standalone helpers (no Temporal needed).")
+feedback = typer.Typer(no_args_is_help=True, help="Read & write per-run feedback (drives the /iterate skill).")
 app.add_typer(run, name="run")
 app.add_typer(tools, name="tools")
+app.add_typer(feedback, name="feedback")
 
 
 # ───── worker / api ─────────────────────────────────────────────────────
@@ -201,12 +204,13 @@ def tools_projects(project_id: Optional[str] = typer.Argument(None, help="If giv
 def tools_pipelines() -> None:
     """List pipelines + their configs."""
     table = Table(title="pipelines/")
-    table.add_column("id"); table.add_column("name"); table.add_column("track"); table.add_column("configs"); table.add_column("needs")
+    table.add_column("id"); table.add_column("name"); table.add_column("configs"); table.add_column("inputs"); table.add_column("outputs")
     for spec in PIPELINES:
         table.add_row(
-            spec.id, spec.name, spec.track,
+            spec.id, spec.name,
             ", ".join(c.id for c in spec.configs),
-            ", ".join(spec.needs) or "—",
+            ", ".join(i.id for i in spec.inputs) or "—",
+            ", ".join(spec.outputs) or "—",
         )
     rprint(table)
 
@@ -291,6 +295,78 @@ def tools_gemini_models() -> None:
 
     for m in gemini.list_models():
         rprint(m)
+
+
+# ───── feedback (drives the /iterate skill) ─────────────────────────────
+
+
+@feedback.command("ls")
+def feedback_ls(
+    all_: bool = typer.Option(False, "--all", "-a", help="Include fulfilled / wontfix (default: open only)"),
+) -> None:
+    """List feedback files across runs."""
+    status = None if all_ else feedback_mod.STATUS_OPEN
+    items = feedback_mod.list_all(status=status)
+    if not items:
+        rprint("[yellow]no feedback found[/yellow]" + ("" if all_ else " (try --all to include closed)"))
+        return
+    table = Table(title="feedback", show_lines=False)
+    table.add_column("status"); table.add_column("run_id"); table.add_column("updated"); table.add_column("addressed by"); table.add_column("preview")
+    for fb in items:
+        addressed = f"{fb.addressed_in_run or '—'} / {fb.addressed_by_config or '—'}"
+        preview = (fb.body.strip().split("\n", 1)[0])[:80]
+        table.add_row(fb.status, fb.run_id, fb.updated_at, addressed, preview)
+    rprint(table)
+
+
+@feedback.command("show")
+def feedback_show(run_id: str = typer.Argument(..., help="Run id")) -> None:
+    """Print one run's feedback (frontmatter + body)."""
+    fb = feedback_mod.load(run_id)
+    if fb is None:
+        rprint(f"[yellow]no feedback at runs/{run_id}/feedback.md[/yellow]")
+        raise typer.Exit(code=1)
+    rprint(fb.model_dump())
+
+
+@feedback.command("close")
+def feedback_close(
+    run_id: str = typer.Argument(..., help="Run id whose feedback you're closing"),
+    by_run: str = typer.Option(..., "--by-run", help="The new run_id that addressed this feedback"),
+    by_config: str = typer.Option(..., "--by-config", help="The new config_id that addressed this feedback"),
+) -> None:
+    """Mark feedback fulfilled and link the iteration that addressed it."""
+    try:
+        fb = feedback_mod.close(run_id, addressed_in_run=by_run, addressed_by_config=by_config)
+    except FileNotFoundError as e:
+        rprint(f"[red]{e}[/red]")
+        raise typer.Exit(code=1)
+    rprint(f"[green]closed[/green] {run_id} → addressed in {by_run} ({by_config})")
+    rprint(fb.model_dump())
+
+
+@feedback.command("wontfix")
+def feedback_wontfix(run_id: str = typer.Argument(..., help="Run id")) -> None:
+    """Mark feedback as wontfix (we decided not to address it)."""
+    try:
+        fb = feedback_mod.set_status(run_id, feedback_mod.STATUS_WONTFIX)
+    except (FileNotFoundError, ValueError) as e:
+        rprint(f"[red]{e}[/red]")
+        raise typer.Exit(code=1)
+    rprint(f"[yellow]wontfix[/yellow] {run_id}")
+    rprint(fb.model_dump())
+
+
+@feedback.command("reopen")
+def feedback_reopen(run_id: str = typer.Argument(..., help="Run id")) -> None:
+    """Re-open a previously closed feedback (status → open)."""
+    try:
+        fb = feedback_mod.set_status(run_id, feedback_mod.STATUS_OPEN)
+    except (FileNotFoundError, ValueError) as e:
+        rprint(f"[red]{e}[/red]")
+        raise typer.Exit(code=1)
+    rprint(f"[green]reopened[/green] {run_id}")
+    rprint(fb.model_dump())
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ Input: PlayableForgeInput. Output: PlayableForgeResult.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Any
 
 from pydantic import BaseModel
@@ -60,11 +60,12 @@ _RETRY = RetryPolicy(initial_interval=timedelta(seconds=2), maximum_attempts=4)
 class PlayableForge:
     @workflow.run
     async def run(self, inp: PlayableForgeInput) -> PlayableForgeResult:
-        started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        started_at = workflow.now().isoformat(timespec="seconds")
 
         analysis: GameAnalysis = await workflow.execute_activity(
             "analyze_gameplay_video",
             VideoAnalysisInput(video_path=inp.video_path),
+            result_type=GameAnalysis,
             start_to_close_timeout=timedelta(minutes=10),
             retry_policy=_RETRY,
             heartbeat_timeout=timedelta(seconds=30),
@@ -79,6 +80,7 @@ class PlayableForge:
                 market_patterns=inp.market_patterns,
                 out_path=base_path,
             ),
+            result_type=PlayableBuildResult,
             start_to_close_timeout=timedelta(minutes=2),
             retry_policy=_RETRY,
         )
@@ -87,6 +89,7 @@ class PlayableForge:
             base = await workflow.execute_activity(
                 "inline_html_assets",
                 base.html_path,
+                result_type=PlayableBuildResult,
                 start_to_close_timeout=timedelta(minutes=2),
                 retry_policy=_RETRY,
             )
@@ -98,6 +101,7 @@ class PlayableForge:
                 variants=inp.variants,
                 out_dir=inp.run_dir,
             ),
+            result_type=VariationsResult,
             start_to_close_timeout=timedelta(minutes=1),
             retry_policy=_RETRY,
         )
@@ -114,6 +118,7 @@ class PlayableForge:
                 params=inp.model_dump(exclude={"market_patterns"}),
                 artifact_globs=["*.html", "*.json", "*.md"],
             ),
+            result_type=FinalizeRunResult,
             start_to_close_timeout=timedelta(seconds=15),
         )
 

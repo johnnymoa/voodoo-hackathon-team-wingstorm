@@ -14,12 +14,12 @@
   --color-canvas:    #14141a;
   --color-surface:   #1c1c24;
   --color-surface-2: #24242c;
-  --color-line:      #2f2f3a;
-  --color-line-2:    #40404e;
-  --color-text:      #ecebe5;
-  --color-text-2:    #b8b6ad;
-  --color-muted:     #82808a;
-  --color-faint:     #54525c;
+  --color-line:      #353544;
+  --color-line-2:    #4a4a5a;
+  --color-text:      #f3f2ec;
+  --color-text-2:    #d6d3c8;
+  --color-muted:     #a09ea8;
+  --color-faint:     #6c6a76;
 
   --color-forge:    #ff6e3d;     /* slightly warmer/softer than the previous #ff5722 */
   --color-saffron:  #f5c54a;
@@ -32,8 +32,8 @@ html, body, #root {
   background: var(--color-canvas);
   color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

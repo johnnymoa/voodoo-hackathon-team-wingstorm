@@ -27,7 +27,7 @@ export interface RunManifest {
   config_id: string;
   status: string;
   started_at: string;
-  completed_at: string;
+  completed_at: string | null;
   params: Record<string, unknown>;
   artifacts: Artifact[];
 }
@@ -59,21 +59,65 @@ export interface PipelineConfig {
   params: Record<string, unknown>;
 }
 
+export interface PipelineInput {
+  id: string;
+  kind: "file" | "dir" | "metadata" | string;
+  description: string;
+  required: boolean;
+}
+
 export interface Pipeline {
   id: string;
   name: string;
-  glyph: string;
-  tagline: string;
-  track: "track-2" | "track-3";
-  needs: string[];
-  produces: string[];
+  description: string;
+  inputs: PipelineInput[];
+  outputs: string[];
   cli: string;
   configs: PipelineConfig[];
+}
+
+export interface StartRunResponse {
+  run_id: string;
+  pipeline: string;
+  project_id: string;
+  config_id: string;
+  started_at: string;
+  status: string;
+}
+
+export type FeedbackStatus = "open" | "fulfilled" | "wontfix";
+
+export interface Feedback {
+  run_id: string;
+  status: FeedbackStatus | string;
+  created_at: string | null;
+  updated_at: string | null;
+  addressed_in_run: string | null;
+  addressed_by_config: string | null;
+  body: string;
+  exists: boolean;
 }
 
 async function jget<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${url}`);
+  return res.json() as Promise<T>;
+}
+
+async function jpost<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `${res.status} ${res.statusText}`;
+    try {
+      const j = await res.json();
+      if (j?.detail) detail = String(j.detail);
+    } catch { /* ignore */ }
+    throw new Error(detail);
+  }
   return res.json() as Promise<T>;
 }
 
@@ -85,6 +129,12 @@ export const api = {
   projectRuns:   (id: string) => jget<RunSummary[]>(`/api/projects/${encodeURIComponent(id)}/runs`),
   runs:          () => jget<RunSummary[]>("/api/runs"),
   run:           (run_id: string) => jget<RunManifest>(`/api/runs/${encodeURIComponent(run_id)}`),
+  startRun:      (pipeline_id: string, project_id: string, config_id = "default") =>
+    jpost<StartRunResponse>("/api/runs", { pipeline_id, project_id, config_id }),
+  getFeedback:   (run_id: string) =>
+    jget<Feedback>(`/api/runs/${encodeURIComponent(run_id)}/feedback`),
+  saveFeedback:  (run_id: string, body: string, status?: FeedbackStatus) =>
+    jpost<Feedback>(`/api/runs/${encodeURIComponent(run_id)}/feedback`, { body, status }),
   text:          async (run_id: string, rel: string) => {
     const res = await fetch(`/api/runs/${encodeURIComponent(run_id)}/text/${rel}`);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);

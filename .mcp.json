@@ -3,7 +3,7 @@
   "mcpServers": {
     "scenario": {
       "type": "http",
-      "url": "https://mcp.scenario.com/?agent=claude-code&auth=oauth"
+      "url": "https://mcp.scenario.com/mcp"
     }
   }
 }

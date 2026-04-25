@@ -17,7 +17,7 @@ the unit of swap; the workflow stays simple.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from pydantic import BaseModel
 from temporalio import workflow
@@ -51,7 +51,9 @@ class CreativeForgeInput(BaseModel):
     period: str = "month"
     sample: int = 30
     render_with_scenario_http: bool = False     # set True for full headless mode
+    render_mode: str = "image"                  # "image" | "video" (Scenario txt2img vs txt2vid)
     num_images: int = 3
+    video_duration_s: int = 5
 
 
 class CreativeForgeResult(BaseModel):
@@ -70,11 +72,12 @@ _RETRY = RetryPolicy(initial_interval=timedelta(seconds=2), maximum_attempts=4)
 class CreativeForge:
     @workflow.run
     async def run(self, inp: CreativeForgeInput) -> CreativeForgeResult:
-        started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        started_at = workflow.now().isoformat(timespec="seconds")
 
         target: TargetGame = await workflow.execute_activity(
             "resolve_target_game",
             TargetGameInput(term=inp.target_term),
+            result_type=TargetGame,
             start_to_close_timeout=timedelta(seconds=30),
             retry_policy=_RETRY,
         )
@@ -85,6 +88,7 @@ class CreativeForge:
                 category=inp.category, country=inp.country,
                 network=inp.network, period=inp.period,
             ),
+            result_type=MarketData,
             start_to_close_timeout=timedelta(minutes=2),
             retry_policy=_RETRY,
             heartbeat_timeout=timedelta(seconds=30),
@@ -93,6 +97,7 @@ class CreativeForge:
         patterns: Patterns = await workflow.execute_activity(
             "extract_patterns",
             PatternExtractionInput(creatives=market.top_creatives, sample=inp.sample),
+            result_type=Patterns,
             start_to_close_timeout=timedelta(minutes=15),
             retry_policy=_RETRY,
             heartbeat_timeout=timedelta(seconds=60),
@@ -122,6 +127,7 @@ class CreativeForge:
         brief: BriefResult = await workflow.execute_activity(
             "write_brief_and_prompt",
             BriefInput(target=target, patterns=patterns, out_dir=inp.run_dir),
+            result_type=BriefResult,
             start_to_close_timeout=timedelta(seconds=30),
             retry_policy=_RETRY,
         )
@@ -134,8 +140,11 @@ class CreativeForge:
                     prompt_path=brief.scenario_prompt_path,
                     out_dir=inp.run_dir,
                     num_images=inp.num_images,
+                    mode=inp.render_mode,
+                    video_duration_s=inp.video_duration_s,
                 ),
-                start_to_close_timeout=timedelta(minutes=5),
+                result_type=ScenarioRenderResult,
+                start_to_close_timeout=timedelta(minutes=15),
                 retry_policy=_RETRY,
                 heartbeat_timeout=timedelta(seconds=60),
             )
@@ -150,8 +159,9 @@ class CreativeForge:
                 config_id=inp.config_id,
                 started_at=started_at,
                 params=inp.model_dump(),
-                artifact_globs=["*.json", "*.md", "*.txt", "*.png", "*.jpg"],
+                artifact_globs=["*.json", "*.md", "*.txt", "*.png", "*.jpg", "*.mp4"],
             ),
+            result_type=FinalizeRunResult,
             start_to_close_timeout=timedelta(seconds=15),
         )
 

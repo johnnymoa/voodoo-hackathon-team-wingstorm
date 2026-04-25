@@ -49,7 +49,6 @@ export function shortenRunId(rid: string): string {
 export const PIPELINE_GLYPH: Record<string, string> = {
   creative_forge: "✦",
   playable_forge: "▲",
-  full_forge:     "◆",
 };
 
 export function pipelineGlyph(pipeline: string | null | undefined): string {

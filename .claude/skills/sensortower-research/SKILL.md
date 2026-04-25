@@ -22,8 +22,8 @@ uv run adforge tools st-top-creatives \
   --save output/top.json
 ```
 
-iOS category IDs in `docs/sensortower_api.md` §9.1. Common: Puzzle=7012, Strategy=7017,
-Casual=7003, RPG=7014, Simulation=7015.
+iOS category IDs in `REFERENCE.md` §9.1 (in this skill folder). Common: Puzzle=7012,
+Strategy=7017, Casual=7003, RPG=7014, Simulation=7015.
 
 **Note:** `network=All Networks` is REJECTED on `creatives/top` — pick one network
 per call. Iterate {TikTok, Admob, Facebook, Unity, Mintegral} for breadth.
@@ -41,7 +41,7 @@ st.store_ranking(os_="ios", category=7012, chart_type="topgrossingapplications")
 
 ## Tips
 
-- **422 errors** — `ad_types` or `network` value not in the allowed list. Check `docs/sensortower_api.md` §9.3 / §9.4.
+- **422 errors** — `ad_types` or `network` value not in the allowed list. Check `REFERENCE.md` §9.3 / §9.4 (in this skill folder).
 - **Rate limit** is 6 QPS, throttled automatically.
 - **Cache busting** — `rm -rf .cache/sensortower/`.
 - **Date defaults** to first of previous month for monthly queries — override with `date="2026-MM-DD"` for weekly/quarterly.

@@ -17,7 +17,12 @@ SMALL_MODEL = "mistral-small-latest"
 
 
 def _client():
-    from mistralai import Mistral
+    # mistralai 2.x relocated the SDK class to `mistralai.client`. Earlier versions
+    # exposed it from the top-level package — keep both paths working.
+    try:
+        from mistralai.client import Mistral
+    except ImportError:
+        from mistralai import Mistral  # type: ignore[no-redef]
 
     key = settings().mistral_api_key
     if not key:

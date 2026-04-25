@@ -109,7 +109,10 @@ class ScenarioRenderInput(BaseModel):
     num_images: int = 3
     width: int = 1024
     height: int = 1820
+    mode: str = "image"          # "image" | "video"
+    video_duration_s: int = 5
 
 
 class ScenarioRenderResult(BaseModel):
-    image_paths: list[str]
+    image_paths: list[str] = []
+    video_paths: list[str] = []

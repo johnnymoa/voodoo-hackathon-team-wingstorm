@@ -1,39 +1,32 @@
 # adforge
 
-> Build ads for your games, faster.
-
-You define a **project** (everything you know about a game). You pick a
-**pipeline** (a recipe). You get a **run** (a self-describing folder of
-artifacts). Each pipeline has named **configs** you can A/B as you iterate.
+> A forge for AI ad pipelines — open it in Claude Code and enter the loop.
 
 ```
-   PROJECT ─────────►   PIPELINE ─────────►   RUN
-   (a game)             (a recipe)            (an output)
-
-   projects/<id>/                             runs/<run_id>/
-   ├ project.json       creative_forge ──┐    ├ manifest.json
-   ├ video.mp4          playable_forge ──┘──► ├ brief.md
-   ├ assets/                                  ├ playable.html
-   └ description, …                           └ patterns.json
+   PROJECT ─────►   PIPELINE ─────►   RUN ─────►   FEEDBACK ─────►   /iterate ─────►   …
+   (a game)         (a recipe)        (an output)   (your notes)       (a new config)
 ```
 
-Built for VoodooHack (Paris, Apr 26–27 2026). Two pipelines today:
+You drop a game into `projects/`, run a pipeline, look at the artefacts in
+`runs/<run_id>/`, write feedback in the UI, then ask Claude Code to
+**`/iterate`** — it ships a new `PipelineConfig` that addresses the feedback
+and runs it. You compare. You repeat. Each pipeline is a Temporal workflow;
+each config is a labeled experiment with a hypothesis you can `git log`.
 
-- `creative_forge` — Track 3, the **video-ad** pipeline (web research → market insights → storyboard → AI-generated video creative).
-- `playable_forge` — Track 2, the **playable** pipeline (video + assets → single-file HTML playable + variants).
-
-## Top-down layout
+## Layout
 
 ```
 adforge/
-├── projects/         INPUTS.   one folder per game (project.json + optional video.mp4 + assets/)
-├── runs/             OUTPUTS.  one folder per execution (manifest.json + artifacts)
-├── src/adforge/      FORGE.    config → connectors → activities → pipelines → cli + api
-├── ui/               VIEWER.   Vite + React + Tailwind. Reads the API.
-├── docs/             notes
+├── projects/         INPUTS.    one folder per game
+├── runs/             OUTPUTS.   manifest.json + artefacts + feedback.md per run
+├── src/adforge/      FORGE.     Python — config → connectors → activities → pipelines → cli + api
+├── ui/               VIEWER.    Vite + React + Tailwind — also where you write feedback
+├── .claude/skills/   KNOWLEDGE. domain skills + iteration recipes Claude Code loads on demand
 ├── .env / .env.example
 └── pyproject.toml
 ```
+
+That's the whole repo. No `docs/` — the knowledge lives in skills.
 
 ## Setup
 
@@ -58,13 +51,37 @@ uv run adforge api
 # 4) Vite UI                      → http://localhost:5173
 cd ui && npm install && npm run dev
 
-# 5) kick off a pipeline against a project
+# 5) kick off a pipeline (or use the Run button in the UI)
 uv run adforge run creative --project castle_clashers
 uv run adforge run playable --project castle_clashers --config default
 ```
 
 The UI is the friendly view. The Temporal Web UI at <http://localhost:8233>
 is the orchestration debugger. Every run deep-links between the two.
+
+## The iteration loop
+
+```
+run → inspect artefacts → write feedback → /iterate → compare → repeat
+```
+
+1. **Run** a pipeline (UI button or CLI).
+2. **Inspect** the artefacts in `runs/<run_id>/`.
+3. **Leave feedback** in the Run page — saves to `runs/<run_id>/feedback.md`
+   with frontmatter (`status: open`, `created_at`, …).
+4. In Claude Code, run **`/iterate`**. The skill reads open feedback, proposes
+   a new `PipelineConfig`, edits the registry (and optionally one activity),
+   runs it, marks the feedback fulfilled with a link to the addressing run.
+5. **Compare** the original and new runs in the UI.
+
+Need a brand-new pipeline (not just a config tweak)? Run **`/new-pipeline`**
+and Claude scaffolds the workflow + activities + registry entry.
+
+```bash
+uv run adforge feedback ls               # what's open across runs
+uv run adforge feedback show <run_id>    # full body + frontmatter
+uv run adforge feedback close <run_id> --by-run <new> --by-config <cfg>  # /iterate calls this
+```
 
 ## Adding a project
 
@@ -90,38 +107,48 @@ Optional fields help pipelines do better work — none are required:
 
 Drop `video.mp4` and `assets/` next to it if you want to run `playable_forge`.
 
-## Pipelines + configs
+## Skills (the knowledge layer)
 
-Each pipeline has named **configs** — presets that swap models, prompts, or
-code paths. Add new ones in `src/adforge/pipelines/__init__.py`. Pick one with
-`--config` (CLI) or via the dropdown on the project detail page (UI).
+`.claude/skills/` is where the intelligence lives. Three verbs run the
+forge — **make** new pipelines, **iterate** on them, **run** them — plus
+a fourth class of skills that **steer** Claude's design choices.
+
+**MAKE** — scaffold new pipelines:
+- `new-pipeline` — from a one-paragraph spec, scaffolds workflow + activities
+  + registry entry + runner branch.
+
+**ITERATE** — turn feedback into the next config:
+- `iterate` — reads open `feedback.md`, ships a new `PipelineConfig` (and
+  optionally one activity-file branch), runs it, closes the feedback.
+
+**RUN** — the pipelines and their helpers:
+- `creative-forge` — project → market patterns → brief + Scenario prompt.
+- `playable-forge` — project (with video) → single-file HTML playable + variants.
+- `scenario-generate` — drive Scenario MCP for images AND image-to-video.
+- `sensortower-research` — raw market intelligence (full API reference bundled inside the skill).
+- `inline-html-assets` — collapse a multi-file playable into one self-contained file.
+
+**STEER** — the design rubrics Claude consults when designing or judging:
+- `playable-ad-design` — full playbook for high-performing playables
+  (hooks, beat map, juice, technical constraints, case studies, checklist).
+- `video-ad-design` — full playbook for high-performing video ads
+  (1.7-second rule, beat map, tone, sound, end-card, variation, case studies).
+
+A skill is a folder with a `SKILL.md`. To add one:
 
 ```bash
-uv run adforge tools pipelines              # list pipelines + their configs
-uv run adforge run creative --project castle_clashers --config default
+mkdir .claude/skills/<name>
+$EDITOR .claude/skills/<name>/SKILL.md
 ```
 
-Iterate fast: clone `default` to `claude-prose`, swap the activity, ship a new
-config. Old runs stay reproducible — their `config_id` is in the manifest.
+Frontmatter format:
 
-## Standalone tools
-
-```bash
-uv run adforge tools env                              # resolved settings
-uv run adforge tools projects                         # list projects
-uv run adforge tools projects castle_clashers        # show one
-uv run adforge tools pipelines                        # list pipelines + configs
-uv run adforge tools runs                             # list runs
-uv run adforge tools runs <run_id>                   # show one manifest
-uv run adforge tools st-search "royal match"          # SensorTower
-uv run adforge tools inline runs/<run_id>/playable.html
+```yaml
+---
+name: <skill-name>
+description: <one paragraph — be specific about WHEN this skill applies>
+---
 ```
-
-## Skills (Claude Code)
-
-In `.claude/skills/`. Invoke with the Skill tool inside Claude Code:
-`creative-forge`, `playable-forge`, `sensortower-research`, `inline-html-assets`,
-`scenario-generate`.
 
 ## Hackathon rules
 

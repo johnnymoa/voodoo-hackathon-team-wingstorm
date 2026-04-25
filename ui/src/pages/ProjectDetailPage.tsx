@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { api, type Pipeline, type ProjectDetail, type RunSummary } from "../lib/api";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { api, type Pipeline, type PipelineInput, type ProjectDetail, type RunSummary } from "../lib/api";
 import { fmtDuration, fmtTime, parseRunId } from "../lib/format";
 import { Pill, StatusPill } from "../components/Pill";
 
@@ -52,12 +52,12 @@ export default function ProjectDetailPage() {
           <h1 className="font-display italic text-[52px] leading-[1.02] tracking-[-0.02em] text-[var(--color-text)]">
             {project.name}
           </h1>
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-[13.5px] text-[var(--color-muted)]">
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-[14px] text-[var(--color-muted)]">
             <span className="font-mono">{project.id}</span>
             {project.genre && <><span className="text-[var(--color-faint)]">·</span><span>{project.genre}</span></>}
           </div>
           {project.description && (
-            <p className="mt-5 max-w-[68ch] text-[15px] leading-relaxed text-[var(--color-text-2)]">
+            <p className="mt-5 max-w-[68ch] text-[16px] leading-relaxed text-[var(--color-text-2)]">
               {project.description}
             </p>
           )}
@@ -71,7 +71,11 @@ export default function ProjectDetailPage() {
       </header>
 
       {/* Run a pipeline */}
-      <h2 className="mb-4 font-display italic text-[28px] tracking-[-0.01em] text-[var(--color-text)]">Run a pipeline</h2>
+      <h2 className="mb-1 font-display italic text-[28px] tracking-[-0.01em] text-[var(--color-text)]">Run a pipeline</h2>
+      <p className="mb-5 max-w-[68ch] text-[14px] text-[var(--color-text-2)]">
+        Pick a pipeline + config, hit Run. We kick off the Temporal workflow and take you to the run page —
+        artefacts stream in as the activities complete.
+      </p>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {pipelines?.map((pipe) => (
           <PipelineLauncher key={pipe.id} project={project} pipe={pipe} />
@@ -83,7 +87,7 @@ export default function ProjectDetailPage() {
         Runs <span className="text-[var(--color-muted)]">· {runs?.length ?? 0}</span>
       </h2>
       {runs && runs.length === 0 && (
-        <div className="rounded border border-dashed border-[var(--color-line-2)] p-8 text-center text-[14px] text-[var(--color-muted)]">
+        <div className="rounded border border-dashed border-[var(--color-line-2)] p-8 text-center text-[14.5px] text-[var(--color-text-2)]">
           No runs yet for this project.
         </div>
       )}
@@ -96,62 +100,115 @@ export default function ProjectDetailPage() {
   );
 }
 
+function isInputSatisfied(project: ProjectDetail, i: PipelineInput): boolean {
+  if (!i.required) return true;
+  if (i.id === "video")    return Boolean(project.video_path);
+  if (i.id === "assets")   return Boolean(project.asset_dir);
+  if (i.id === "metadata") return true;
+  return true;
+}
+
 function PipelineLauncher({ project, pipe }: { project: ProjectDetail; pipe: Pipeline }) {
+  const navigate = useNavigate();
   const [configId, setConfigId] = useState<string>(pipe.configs[0]?.id ?? "default");
   const cfg = useMemo(() => pipe.configs.find((c) => c.id === configId), [pipe, configId]);
-  const blocked = pipe.needs.includes("video") && !project.video_path;
-  const cli = `uv run adforge run ${pipe.id.replace("_forge", "")} --project ${project.id}${configId !== "default" ? ` --config ${configId}` : ""}`;
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(cli); } catch { /* ignore */ }
+  const missing = pipe.inputs.filter((i) => !isInputSatisfied(project, i));
+  const blocked = missing.length > 0;
+
+  const onRun = async () => {
+    if (blocked || busy) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await api.startRun(pipe.id, project.id, configId);
+      navigate(`/runs/${encodeURIComponent(res.run_id)}`);
+    } catch (e) {
+      setErr(String(e instanceof Error ? e.message : e));
+      setBusy(false);
+    }
   };
 
   return (
-    <div className={`relative overflow-hidden rounded-lg border bg-[var(--color-surface)] p-6 ${blocked ? "border-[var(--color-line)] opacity-60" : "border-[var(--color-line)] hover:border-[var(--color-forge)]/40"}`}>
+    <div className={`relative overflow-hidden rounded-lg border bg-[var(--color-surface)] p-6 ${blocked ? "border-[var(--color-line)]" : "border-[var(--color-line)] hover:border-[var(--color-forge)]/40"}`}>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-display italic text-[24px] leading-tight tracking-[-0.01em] text-[var(--color-text)]">
+        <div className="min-w-0">
+          <h3 className="font-display italic text-[26px] leading-tight tracking-[-0.01em] text-[var(--color-text)]">
             {pipe.name}
           </h3>
-          <p className="mt-1.5 max-w-[42ch] text-[13.5px] leading-relaxed text-[var(--color-text-2)]">
-            {pipe.tagline}
-          </p>
+          <div className="mt-1 font-mono text-[11.5px] text-[var(--color-muted)]">{pipe.id}</div>
         </div>
-        <span className="font-display italic text-[34px] text-[var(--color-forge)]/60">{pipe.glyph}</span>
       </div>
 
+      <p className="mt-4 max-w-[48ch] text-[14.5px] leading-relaxed text-[var(--color-text-2)]">
+        {pipe.description}
+      </p>
+
+      {pipe.inputs.length > 0 && (
+        <ul className="mt-4 flex flex-wrap gap-1.5">
+          {pipe.inputs.map((i) => {
+            const ok = isInputSatisfied(project, i);
+            return (
+              <Pill key={i.id} tone={ok ? "emerald" : (i.required ? "rust" : "muted")}>
+                {i.id}{ok ? " ✓" : (i.required ? " missing" : " optional")}
+              </Pill>
+            );
+          })}
+        </ul>
+      )}
+
       {blocked && (
-        <div className="mt-4 rounded border border-[var(--color-rust)]/30 bg-[var(--color-rust)]/5 px-3 py-2 text-[12.5px] text-[var(--color-rust)]">
-          needs <code className="font-mono">video.mp4</code> in this project
+        <div className="mt-4 rounded border border-[var(--color-rust)]/30 bg-[var(--color-rust)]/5 px-3 py-2 text-[13px] text-[var(--color-rust)]">
+          missing {missing.map((m) => m.id).join(", ")} — drop the file(s) into{" "}
+          <code className="font-mono text-[12px]">projects/{project.id}/</code>
         </div>
       )}
 
       <div className="mt-5">
-        <label className="text-[12px] text-[var(--color-muted)]">Config</label>
+        <label className="text-[12px] uppercase tracking-[0.08em] text-[var(--color-muted)]">Config</label>
         <select
           value={configId}
           onChange={(e) => setConfigId(e.target.value)}
-          className="mt-1 w-full rounded border border-[var(--color-line-2)] bg-[var(--color-canvas)] px-3 py-2 text-[13.5px] text-[var(--color-text)] focus:border-[var(--color-forge)] focus:outline-none"
+          className="mt-1.5 w-full rounded border border-[var(--color-line-2)] bg-[var(--color-canvas)] px-3 py-2 text-[14px] text-[var(--color-text)] focus:border-[var(--color-forge)] focus:outline-none"
         >
           {pipe.configs.map((c) => (
-            <option key={c.id} value={c.id}>{c.name} — {c.description}</option>
+            <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
         {cfg && (
-          <p className="mt-2 text-[12.5px] text-[var(--color-muted)]">{cfg.description}</p>
+          <p className="mt-2 text-[13px] text-[var(--color-text-2)]">{cfg.description}</p>
         )}
       </div>
 
       <button
-        onClick={copy}
-        disabled={blocked}
-        className={`mt-5 group block w-full text-left ${blocked ? "cursor-not-allowed" : ""}`}
+        onClick={onRun}
+        disabled={blocked || busy}
+        className={`mt-5 w-full rounded-md px-5 py-3 text-[15px] font-medium transition-opacity ${
+          blocked
+            ? "cursor-not-allowed bg-[var(--color-line)] text-[var(--color-faint)]"
+            : busy
+              ? "cursor-wait bg-[var(--color-forge)]/70 text-[var(--color-canvas)]"
+              : "bg-[var(--color-forge)] text-[var(--color-canvas)] hover:opacity-90"
+        }`}
       >
-        <div className="text-[12px] text-[var(--color-muted)]">CLI · click to copy</div>
-        <div className="mt-1 break-all rounded border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2.5 font-mono text-[12.5px] text-[var(--color-text)] group-hover:border-[var(--color-forge)] group-hover:text-[var(--color-forge)] transition-colors">
-          {cli}
-        </div>
+        {busy ? "Starting…" : blocked ? "Cannot run" : "Run"}
       </button>
+
+      {err && (
+        <div className="mt-3 rounded border border-[var(--color-rust)]/30 bg-[var(--color-rust)]/5 px-3 py-2 text-[13px] text-[var(--color-rust)]">
+          {err}
+        </div>
+      )}
+
+      <details className="mt-4 text-[12.5px]">
+        <summary className="cursor-pointer text-[var(--color-muted)] hover:text-[var(--color-text-2)]">CLI equivalent</summary>
+        <code className="mt-2 block break-all rounded border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 font-mono text-[12px] text-[var(--color-text-2)]">
+          uv run adforge run {pipe.id.replace("_forge", "")} --project {project.id}
+          {configId !== "default" ? ` --config ${configId}` : ""}
+        </code>
+      </details>
     </div>
   );
 }

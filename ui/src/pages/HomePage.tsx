@@ -31,14 +31,16 @@ export default function HomePage() {
           aria-hidden
         />
         <div className="relative px-10 pt-14 pb-16">
-          <h1 className="max-w-[24ch] font-display text-[64px] leading-[1.0] tracking-[-0.02em] text-[var(--color-text)]">
-            <span className="italic">Build ads for your games,</span>{" "}
-            <span className="italic text-[var(--color-forge)]">faster.</span>
+          <h1 className="max-w-[26ch] font-display text-[64px] leading-[1.0] tracking-[-0.02em] text-[var(--color-text)]">
+            <span className="italic">Run pipelines on projects,</span>{" "}
+            <span className="italic text-[var(--color-forge)]">make artefacts.</span>
           </h1>
-          <p className="mt-6 max-w-[68ch] text-[16px] leading-relaxed text-[var(--color-text-2)]">
-            adforge runs Temporal pipelines on your <em className="font-display not-italic text-[var(--color-text)]">projects</em> (games)
-            to produce <em className="font-display not-italic text-[var(--color-text)]">runs</em> (folders of artifacts you can ship).
-            Two pipelines today: a video-ad creator and a playable-ad builder.
+          <p className="mt-6 max-w-[70ch] text-[17px] leading-relaxed text-[var(--color-text-2)]">
+            adforge is a forge for AI ad pipelines. Drop a game into{" "}
+            <em className="font-display not-italic text-[var(--color-text)]">projects/</em>,
+            pick a <em className="font-display not-italic text-[var(--color-text)]">pipeline</em>,
+            click run. Each pipeline is a Temporal workflow with named configs you can A/B —
+            so you tune them scientifically while the rest of the harness stays put.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
@@ -61,7 +63,7 @@ export default function HomePage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <SummaryCard
           title="Projects"
-          tagline="One folder per game. Drop a project.json + optional video + assets."
+          tagline="The input material. One folder per game — drop in a project.json plus whatever assets you have."
           count={projects?.length}
           countLabel="on disk"
           href="/projects"
@@ -69,15 +71,15 @@ export default function HomePage() {
         />
         <SummaryCard
           title="Pipelines"
-          tagline="Recipes that turn projects into runs. Each has named configs to A/B."
+          tagline="The recipes. Each one declares its inputs and outputs and runs as a Temporal workflow."
           count={pipelines?.length}
           countLabel="available"
           href="/pipelines"
-          previews={pipelines?.map((p) => ({ key: p.id, label: p.name, hint: p.tagline.split("→")[0].trim() }))}
+          previews={pipelines?.map((p) => ({ key: p.id, label: p.name, hint: p.description.split("→")[0].trim() }))}
         />
         <SummaryCard
           title="Runs"
-          tagline="One folder per execution. Manifest + artifacts, deep-linked to Temporal."
+          tagline="The artefacts. One folder per execution — manifest, files, deep-linked to Temporal."
           count={runs?.length}
           countLabel="on disk"
           href="/runs"
@@ -100,8 +102,8 @@ export default function HomePage() {
           )}
         </div>
         {runs && runs.length === 0 && (
-          <div className="rounded border border-dashed border-[var(--color-line-2)] p-8 text-center text-[14px] text-[var(--color-muted)]">
-            No runs yet — open a project and hit "run" on a pipeline.
+          <div className="rounded border border-dashed border-[var(--color-line-2)] p-8 text-center text-[14.5px] text-[var(--color-text-2)]">
+            No runs yet — open a project and hit <span className="text-[var(--color-forge)]">Run</span> on a pipeline.
           </div>
         )}
         {runs && runs.length > 0 && (
