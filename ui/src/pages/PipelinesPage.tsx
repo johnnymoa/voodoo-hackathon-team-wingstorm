@@ -18,9 +18,9 @@ export default function PipelinesPage() {
   return (
     <section className="page-in">
       <PageHeader
-        eyebrow="The forge"
-        title="Pipelines."
-        subtitle="A pipeline declares its inputs, its outputs, and a few named configs you can A/B. Adding a new one is one PipelineSpec entry plus a workflow class — same UI, same CLI, no plumbing."
+        eyebrow="the forge"
+        title="pipelines"
+        subtitle="a pipeline declares its inputs, its outputs, and a few named configs you can a/b. adding a new one is one pipelinespec entry plus a workflow class — same ui, same cli, no plumbing."
       />
 
       {err && (
@@ -42,7 +42,7 @@ export default function PipelinesPage() {
 
 function PipelineCard({ p }: { p: Pipeline }) {
   return (
-    <article className="relative overflow-hidden rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-7 transition-colors hover:border-[var(--color-line-2)]">
+    <article className="card-pop relative overflow-hidden bg-[var(--color-surface)] p-7">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-display italic text-[34px] leading-[1.05] tracking-[-0.015em] text-[var(--color-text)]">
@@ -54,7 +54,7 @@ function PipelineCard({ p }: { p: Pipeline }) {
 
       <p className="mt-5 max-w-[60ch] text-[15px] leading-relaxed text-[var(--color-text-2)]">{p.description}</p>
 
-      <div className="mt-6 grid grid-cols-1 gap-5 border-t border-[var(--color-line)] pt-5 sm:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-5 border-t-[3px] border-[var(--color-line)] pt-5 sm:grid-cols-2">
         <div>
           <div className="text-[12px] uppercase tracking-[0.08em] text-[var(--color-muted)]">Inputs</div>
           <ul className="mt-2.5 space-y-2">
@@ -71,7 +71,7 @@ function PipelineCard({ p }: { p: Pipeline }) {
         </div>
       </div>
 
-      <div className="mt-6 border-t border-[var(--color-line)] pt-5">
+      <div className="mt-6 border-t-[3px] border-[var(--color-line)] pt-5">
         <div className="text-[12px] uppercase tracking-[0.08em] text-[var(--color-muted)]">Configs · {p.configs.length}</div>
         <ul className="mt-2.5 space-y-2">
           {p.configs.map((c) => (
@@ -99,14 +99,14 @@ function InputRow({ i }: { i: PipelineInput }) {
 
 function AddPipelinePanel() {
   return (
-    <section className="mt-14 overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)]">
-      <div className="border-b border-[var(--color-line)] px-7 py-4">
+    <section className="card-pop mt-14 overflow-hidden bg-[var(--color-surface)]">
+      <div className="border-b-[3px] border-[var(--color-line)] px-7 py-4">
         <div className="text-[12px] uppercase tracking-[0.1em] text-[var(--color-muted)]">Vibe-coding a new pipeline</div>
         <h2 className="mt-1.5 font-display italic text-[26px] tracking-[-0.01em] text-[var(--color-text)]">
           Three edits and you're shipped.
         </h2>
       </div>
-      <ol className="grid grid-cols-1 divide-[var(--color-line)] md:grid-cols-3 md:divide-x">
+      <ol className="grid grid-cols-1 divide-[var(--color-line)] md:grid-cols-3 md:divide-x-[3px]">
         <Step
           n="1"
           title="Declare it."
@@ -126,7 +126,7 @@ function AddPipelinePanel() {
           path="src/adforge/activities/<step>.py"
         />
       </ol>
-      <div className="border-t border-[var(--color-line)] bg-[var(--color-surface-2)] px-7 py-4 text-[13.5px] text-[var(--color-text-2)]">
+      <div className="border-t-[3px] border-[var(--color-line)] bg-[var(--color-surface-2)] px-7 py-4 text-[13.5px] text-[var(--color-text-2)]">
         The CLI, API, and UI all read from the registry — your pipeline appears everywhere as soon as you save.
       </div>
     </section>
