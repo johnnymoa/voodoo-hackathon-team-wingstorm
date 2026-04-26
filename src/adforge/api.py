@@ -55,6 +55,7 @@ def _read_manifest(run_id: str) -> dict[str, Any] | None:
         # *completed* if the pipeline's expected final artifact exists; *failed*
         # if the run dir is older than 30 minutes with no signal of progress.
         m = _self_heal(run_id, m)
+        m = _normalize_artifacts(run_id, m)
         return m
     except Exception:
         return None
@@ -123,6 +124,38 @@ def _self_heal(run_id: str, m: dict[str, Any]) -> dict[str, Any]:
             m["status_inferred"] = True
             return m
 
+    return m
+
+
+def _normalize_artifacts(run_id: str, m: dict[str, Any]) -> dict[str, Any]:
+    """Normalize artifact entries so the UI always gets {name, kind, size_bytes}.
+
+    Agent-written manifests use {type, path, label} instead. Convert them,
+    and if artifacts are still empty, auto-discover from disk.
+    """
+    arts = m.get("artifacts")
+    if not arts:
+        return m
+
+    needs_fix = any(("name" not in a and "path" in a) for a in arts)
+    if not needs_fix:
+        return m
+
+    run_dir = RUNS_DIR / run_id
+    m = dict(m)
+    normalized = []
+    for a in arts:
+        if "name" in a:
+            normalized.append(a)
+            continue
+        rel = a.get("path", "")
+        fp = run_dir / rel
+        normalized.append({
+            "name": rel,
+            "kind": Path(rel).suffix.lstrip(".").lower() or "bin",
+            "size_bytes": fp.stat().st_size if fp.is_file() else 0,
+        })
+    m["artifacts"] = normalized
     return m
 
 

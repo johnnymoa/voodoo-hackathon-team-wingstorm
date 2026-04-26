@@ -48,12 +48,16 @@ class Project(BaseModel):
     project_dir: str
     video_path: str | None = None
     asset_dir: str | None = None
+    playable_path: str | None = None
 
     def has_video(self) -> bool:
         return self.video_path is not None
 
     def has_assets(self) -> bool:
         return self.asset_dir is not None
+
+    def has_playable(self) -> bool:
+        return self.playable_path is not None
 
 
 def list_projects() -> list[str]:
@@ -80,6 +84,7 @@ def load(project_id: str) -> Project:
 
     video = pdir / "video.mp4"
     assets = pdir / "assets"
+    playable = pdir / "playable.html"
     return Project(
         id=project_id,
         name=meta.get("name", project_id),
@@ -93,4 +98,5 @@ def load(project_id: str) -> Project:
         project_dir=str(pdir),
         video_path=str(video) if video.is_file() else None,
         asset_dir=str(assets) if assets.is_dir() else None,
+        playable_path=str(playable) if playable.is_file() else None,
     )

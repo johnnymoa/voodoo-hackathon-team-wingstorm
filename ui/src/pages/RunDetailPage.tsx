@@ -349,18 +349,13 @@ const KIND_LABEL: Record<string, string> = {
   jpg:  "Images",
   jpeg: "Images",
   webp: "Images",
-  mp4:  "Videos",
-  webm: "Videos",
-  mov:  "Videos",
-  m4v:  "Videos",
-  ogv:  "Videos",
 };
 
 function groupArtifacts(arts: Artifact[]): { kind: string; items: Artifact[] }[] {
-  const PRIORITY = ["html", "mp4", "webm", "mov", "m4v", "ogv", "md", "txt", "json", "png", "jpg", "jpeg", "webp", "svg"];
+  const PRIORITY = ["html", "md", "txt", "json", "png", "jpg", "jpeg", "webp", "svg"];
   const map = new Map<string, Artifact[]>();
   for (const a of arts) {
-    const k = (a.kind || "bin").toLowerCase();
+    const k = a.kind || "bin";
     map.set(k, [...(map.get(k) ?? []), a]);
   }
   const ordered: { kind: string; items: Artifact[] }[] = [];
@@ -370,9 +365,9 @@ function groupArtifacts(arts: Artifact[]): { kind: string; items: Artifact[] }[]
 }
 
 function pickPrimary(arts: Artifact[]): Artifact | null {
-  const ORDER = ["html", "mp4", "webm", "mov", "md", "txt", "json", "png"];
+  const ORDER = ["html", "md", "txt", "json", "png"];
   for (const k of ORDER) {
-    const hit = arts.find((a) => a.kind.toLowerCase() === k);
+    const hit = arts.find((a) => a.kind === k);
     if (hit) return hit;
   }
   return arts[0] ?? null;

@@ -59,6 +59,7 @@ _PIPELINE_SHORT = {
     "creative_forge": "creative",
     "playable_forge": "playable",
     "market_intel": "intel",
+    "playable_variations": "variations",
 }
 
 
@@ -101,6 +102,11 @@ def _build_workflow_input(
         return MarketIntelInput(
             project_id=project.id, run_id=run_id, run_dir=run_dir, config_id=config_id,
             video_path=project.video_path,
+        )
+    if pipeline_id == "playable_variations":
+        raise StartRunError(
+            "playable_variations is a pure-agentic pipeline (no Temporal). "
+            "Run it with: uv run python /tmp/playable_variations.py --project <id>"
         )
     raise StartRunError(f"unknown pipeline '{pipeline_id}'")
 

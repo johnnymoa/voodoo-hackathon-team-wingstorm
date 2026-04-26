@@ -293,6 +293,37 @@ PIPELINES: list[PipelineSpec] = [
             ),
         ],
     ),
+    PipelineSpec(
+        id="playable_variations",
+        name="Playable Variations",
+        description=(
+            "Takes an existing playable HTML as input, parses its CONFIG block "
+            "(or injects CSS-level tweaks for vsdk-based playables), and generates "
+            "smart variations — colors, speeds, difficulty, visual effects. "
+            "Pure agentic pipeline (no Temporal). Run from Claude Code."
+        ),
+        output_kind="playable",
+        inputs=[
+            PipelineInput(id="playable", kind="file",
+                description="Existing playable.html (from project dir or a previous run)."),
+            PipelineInput(id="metadata", kind="metadata",
+                description="Game name, genre — from project.json.", required=False),
+        ],
+        outputs=["playable__*.html", "variations_manifest.json"],
+        cli="uv run python /tmp/playable_variations.py --project <id>",
+        configs=[
+            PipelineConfig(
+                id="default",
+                name="Smart Variations",
+                description="Claude analyzes the CONFIG block + game context, proposes 5-8 coherent variations (palette, difficulty, pacing, visual effects).",
+            ),
+            PipelineConfig(
+                id="aggressive",
+                name="Aggressive Variations",
+                description="Wider parameter sweeps — extreme difficulty, wild palettes, very short/long sessions.",
+            ),
+        ],
+    ),
 ]
 
 

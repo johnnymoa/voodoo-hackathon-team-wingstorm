@@ -50,18 +50,26 @@ Thumbs.db
 .claude/.credentials/
 .claude/projects/
 
-# projects/ — gameplay videos are large; commit metadata + assets, never videos
-projects/**/video.mp4
-projects/**/video.mov
-projects/**/video.webm
-projects/**/video.gif
-projects/**/raw/
-projects/**/scenario_downloads/
+# Game IP — projects contain proprietary game assets, GDDs, and gameplay videos.
+# Keep the directory structure for the framework, but never commit game content.
+projects/*
+!projects/.gitkeep
+!projects/README.md
+
+# Reference playables — third-party ad examples, not ours to publish.
+reference_playables/
+
+# Misc hackathon scratch files
+docs/
+Makefile
+SIMPLIFY.md
+TRACKS.md
+Sensor\ Tower\ API\ Reference.html
+2\ new\ projects\ to\ onbaord\ playables/
 
 # runs/ — every pipeline execution. Keep the dir, drop the contents.
 runs/*
 !runs/.gitkeep
-!runs/README.md
 
 # UI build output (Vite)
 ui/dist/

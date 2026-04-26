@@ -10,6 +10,7 @@ import ProjectDetailPage from "./pages/ProjectDetailPage";
 import PipelinesPage from "./pages/PipelinesPage";
 import RunsPage from "./pages/RunsPage";
 import RunDetailPage from "./pages/RunDetailPage";
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
