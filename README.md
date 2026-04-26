@@ -2,6 +2,12 @@
 
 > A forge for AI-driven ad pipelines, built live at the Voodoo x Anthropic hackathon.
 
+### Live demos
+
+- [**Play Castle Busters**](https://johnnym.dev/p/castlebusters/) — playable ad (single-file HTML, all assets inlined)
+- [**Watch the video ad**](https://johnnym.dev/p/castlebusters-ad/) — AI-generated video ad concept (Scenario Seedance 2.0)
+- [**Read the creative brief**](https://johnnym.dev/p/castlebusters-brief/) — market-backed brief with SensorTower data
+
 ```
    PROJECT ─────►   PIPELINE ─────►   RUN ─────►   FEEDBACK ─────►   /iterate ─────►   …
    (a game)         (a recipe)        (an output)   (your notes)       (a new config)
