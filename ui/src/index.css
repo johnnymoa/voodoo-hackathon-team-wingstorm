@@ -1,30 +1,27 @@
+@import url("https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
-/* ─── Design tokens ─────────────────────────────────────────────────────────
-   Aesthetic: studio / atelier. A modern, readable workspace for builders.
-   Inter for body (friendlier than mono), Fraunces italic for editorial heads,
-   JetBrains Mono only for ids / paths / code. Warmer surface, gentler contrast.
-*/
+/* marketing-facing theme: warm, tactile, simple, and intentionally lowercase. */
 
 @theme {
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
-  --font-sans:    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: "Josefin Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans:    "Josefin Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:    "Josefin Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --color-canvas:    #14141a;
-  --color-surface:   #1c1c24;
-  --color-surface-2: #24242c;
-  --color-line:      #353544;
-  --color-line-2:    #4a4a5a;
-  --color-text:      #f3f2ec;
-  --color-text-2:    #d6d3c8;
-  --color-muted:     #a09ea8;
-  --color-faint:     #6c6a76;
+  --color-canvas:    #fffcf2;
+  --color-surface:   #fff8df;
+  --color-surface-2: #ffe599;
+  --color-line:      #000000;
+  --color-line-2:    #000000;
+  --color-text:      #000000;
+  --color-text-2:    #000000;
+  --color-muted:     #3f3f3f;
+  --color-faint:     #686868;
 
-  --color-forge:    #ff6e3d;     /* slightly warmer/softer than the previous #ff5722 */
-  --color-saffron:  #f5c54a;
+  --color-forge:    #9fc5f8;
+  --color-saffron:  #ffe599;
   --color-emerald:  #6dd09a;
-  --color-rust:     #f47878;
+  --color-rust:     #f89f9f;
 }
 
 html, body, #root {
@@ -34,6 +31,7 @@ html, body, #root {
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.6;
+  text-transform: lowercase;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -42,25 +40,65 @@ body::before {
   content: "";
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background-image:
-    radial-gradient(circle at 18% -10%, rgba(255, 110, 61, 0.06), transparent 45%),
-    radial-gradient(circle at 110% 110%, rgba(245, 197, 74, 0.04), transparent 50%);
+    radial-gradient(circle at 12% -10%, rgba(159, 197, 248, 0.45), transparent 36%),
+    radial-gradient(circle at 92% 4%, rgba(255, 229, 153, 0.55), transparent 34%),
+    radial-gradient(circle at 90% 110%, rgba(248, 159, 159, 0.35), transparent 40%);
 }
 
 .font-display { font-family: var(--font-display); }
 .font-mono    { font-family: var(--font-mono); }
 
-::selection { background: var(--color-forge); color: var(--color-canvas); }
+::selection { background: var(--color-rust); color: var(--color-text); }
 
 ::-webkit-scrollbar { width: 12px; height: 12px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-line-2); }
 
-/* Subtle blueprint grid (used on hero/empty states) */
+button, a, select, textarea, input {
+  font: inherit;
+}
+
+.rounded,
+.rounded-md,
+.rounded-lg,
+.rounded-xl,
+.rounded-full {
+  border-radius: 3px;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-tertiary {
+  border: 3px solid #000;
+  border-radius: 3px;
+  color: #000;
+  box-shadow: 4px 4px 0 #000;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.btn-primary { background: var(--color-forge); }
+.btn-secondary { background: var(--color-saffron); }
+.btn-tertiary { background: var(--color-rust); }
+
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-tertiary:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 #000;
+}
+
+.card-pop {
+  border: 3px solid #000;
+  border-radius: 3px;
+  box-shadow: 6px 6px 0 #000;
+}
+
+/* subtle notebook grid used on hero/empty states */
 .bp-grid {
   background-image:
-    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
   background-size: 36px 36px;
   background-position: -1px -1px;
 }
@@ -69,8 +107,7 @@ body::before {
 .prose-studio { color: var(--color-text); font-size: 15px; line-height: 1.7; }
 .prose-studio h1, .prose-studio h2, .prose-studio h3 {
   font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--color-text);
   margin: 1.6em 0 0.5em;
@@ -102,11 +139,10 @@ body::before {
 .prose-studio ul, .prose-studio ol { padding-left: 1.5em; margin: 0.6em 0; color: var(--color-text-2); }
 .prose-studio li { margin: 0.3em 0; }
 .prose-studio blockquote {
-  border-left: 3px solid var(--color-forge);
+  border-left: 3px solid var(--color-line);
   padding-left: 16px;
   margin: 1em 0;
   color: var(--color-text-2);
-  font-style: italic;
   font-family: var(--font-display);
   font-size: 17px;
 }
@@ -145,5 +181,5 @@ body::before {
 .pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
 
 /* Hairline row for tables/lists */
-.row-hairline { border-bottom: 1px solid var(--color-line); }
+.row-hairline { border-bottom: 2px solid var(--color-line); }
 .row-hairline:hover { background: var(--color-surface-2); }

@@ -14,6 +14,12 @@ export interface RunSummary {
   has_manifest: boolean;
 }
 
+export interface ProjectFile {
+  name: string;
+  rel_path: string;
+  size_bytes: number;
+}
+
 export interface Artifact {
   name: string;
   kind: string;
@@ -36,11 +42,20 @@ export interface Project {
   id: string;
   name: string;
   genre?: string | null;
+  subgenre?: string | null;
+  elevator_pitch?: string | null;
+  summary?: string | null;
+  art_style?: string | null;
+  color_palette?: string[];
+  juice?: string | null;
   description?: string | null;
   category_id?: string;
   country?: string;
   has_video: boolean;
   has_assets: boolean;
+  screenshots?: ProjectFile[];
+  gameplay_videos?: ProjectFile[];
+  design_documents?: ProjectFile[];
   notes?: string | null;
 }
 
@@ -85,6 +100,11 @@ export interface StartRunResponse {
   status: string;
 }
 
+export interface UploadProjectResponse {
+  project_id: string;
+  project: Project;
+}
+
 export type FeedbackStatus = "open" | "fulfilled" | "wontfix";
 
 export interface Feedback {
@@ -126,6 +146,18 @@ export const api = {
   pipelines:     () => jget<Pipeline[]>("/api/pipelines"),
   projects:      () => jget<Project[]>("/api/projects"),
   project:       (id: string) => jget<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`),
+  uploadProject: async (body: FormData) => {
+    const res = await fetch("/api/projects/upload", { method: "POST", body });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try {
+        const j = await res.json();
+        if (j?.detail) detail = String(j.detail);
+      } catch { /* ignore */ }
+      throw new Error(detail);
+    }
+    return res.json() as Promise<UploadProjectResponse>;
+  },
   projectRuns:   (id: string) => jget<RunSummary[]>(`/api/projects/${encodeURIComponent(id)}/runs`),
   runs:          () => jget<RunSummary[]>("/api/runs"),
   run:           (run_id: string) => jget<RunManifest>(`/api/runs/${encodeURIComponent(run_id)}`),
@@ -141,6 +173,7 @@ export const api = {
     return res.text();
   },
   artifactUrl:   (run_id: string, rel: string) => `/artifacts/${encodeURIComponent(run_id)}/${rel}`,
+  projectFileUrl: (project_id: string, rel: string) => `/project-files/${encodeURIComponent(project_id)}/${rel}`,
   temporalUrl:   (run_id: string, namespace = "default") =>
     `http://localhost:8233/namespaces/${namespace}/workflows/${encodeURIComponent(run_id)}`,
 };

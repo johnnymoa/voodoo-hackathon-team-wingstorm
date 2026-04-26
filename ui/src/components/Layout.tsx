@@ -2,25 +2,25 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 
 const NAV = [
-  { to: "/projects",  label: "Projects" },
-  { to: "/pipelines", label: "Pipelines" },
-  { to: "/runs",      label: "Runs" },
+  { to: "/projects",  label: "projects" },
+  { to: "/pipelines", label: "pipelines" },
+  { to: "/runs",      label: "history" },
 ];
 
 export function Layout() {
   const loc = useLocation();
   return (
     <div className="relative min-h-full">
-      <header className="sticky top-0 z-20 border-b border-[var(--color-line)] bg-[color:var(--color-canvas)]/85 backdrop-blur-sm">
+      <header className="sticky top-0 z-20 border-b-[3px] border-[var(--color-line)] bg-[color:var(--color-canvas)]/90 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-[1320px] items-center gap-7 px-7">
           <NavLink
             to="/"
-            className="font-display italic text-[22px] leading-none tracking-[-0.02em] text-[var(--color-text)] hover:text-[var(--color-forge)] transition-colors"
+            className="font-display text-[24px] font-bold leading-none tracking-[-0.02em] text-[var(--color-text)] transition-colors hover:text-[var(--color-rust)]"
           >
             adforge
           </NavLink>
           <span className="hidden text-[12px] text-[var(--color-muted)] md:inline">
-            project → pipeline → run
+            game info → marketing output
           </span>
 
           <nav className="ml-auto flex items-center gap-1">
@@ -32,29 +32,18 @@ export function Layout() {
                   to={n.to}
                   className={`relative px-4 py-2 text-[13.5px] transition-colors ${
                     active
-                      ? "text-[var(--color-text)]"
+                      ? "font-bold text-[var(--color-text)]"
                       : "text-[var(--color-muted)] hover:text-[var(--color-text-2)]"
                   }`}
                 >
                   {n.label}
                   {active && (
-                    <span className="absolute inset-x-3 -bottom-[1px] h-[2px] bg-[var(--color-forge)]" />
+                    <span className="absolute inset-x-3 -bottom-[9px] h-[5px] rounded bg-[var(--color-rust)]" />
                   )}
                 </NavLink>
               );
             })}
           </nav>
-
-          <a
-            href="http://localhost:8233"
-            target="_blank"
-            rel="noreferrer"
-            className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-line-2)] px-3 py-1.5 text-[12px] text-[var(--color-text-2)] hover:border-[var(--color-forge)] hover:text-[var(--color-forge)]"
-            title="Open Temporal Web UI"
-          >
-            Temporal
-            <span aria-hidden>↗</span>
-          </a>
         </div>
       </header>
 
@@ -69,16 +58,16 @@ export function Layout() {
 
 function Footer() {
   return (
-    <footer className="mt-24 border-t border-[var(--color-line)]">
+    <footer className="mt-24 border-t-[3px] border-[var(--color-line)]">
       <div className="mx-auto flex max-w-[1320px] items-center justify-between px-7 py-6 text-[12px] text-[var(--color-muted)]">
         <span>adforge</span>
-        <span>v0.2 · localhost</span>
+        <span>built for marketing teams</span>
       </div>
     </footer>
   );
 }
 
-/** Page header used by all top-level routes. Bigger, less typographic noise. */
+/** page header used by all top-level routes. */
 export function PageHeader({
   eyebrow, title, subtitle, right,
 }: {
@@ -88,14 +77,14 @@ export function PageHeader({
   right?: ReactNode;
 }) {
   return (
-    <div className="mb-10 flex items-end justify-between gap-6 border-b border-[var(--color-line)] pb-7">
+    <div className="mb-10 flex items-end justify-between gap-6 border-b-[3px] border-[var(--color-line)] pb-7">
       <div className="min-w-0">
         {eyebrow && (
-          <div className="mb-2 text-[12px] uppercase tracking-[0.12em] text-[var(--color-muted)]">
+          <div className="mb-2 text-[12px] font-bold tracking-[0.12em] text-[var(--color-muted)]">
             {eyebrow}
           </div>
         )}
-        <h1 className="font-display italic text-[44px] leading-[1.05] tracking-[-0.015em] text-[var(--color-text)]">
+        <h1 className="font-display text-[48px] font-bold leading-[1.05] tracking-[-0.025em] text-[var(--color-text)]">
           {title}
         </h1>
         {subtitle && (

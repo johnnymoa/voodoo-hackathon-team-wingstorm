@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 
 const TONES = {
-  default:   "border-[var(--color-line-2)] text-[var(--color-text-2)] bg-transparent",
-  forge:     "border-[var(--color-forge)]/60 text-[var(--color-forge)] bg-[var(--color-forge)]/10",
-  emerald:   "border-[var(--color-emerald)]/60 text-[var(--color-emerald)] bg-[var(--color-emerald)]/10",
-  rust:      "border-[var(--color-rust)]/60 text-[var(--color-rust)] bg-[var(--color-rust)]/10",
-  saffron:   "border-[var(--color-saffron)]/60 text-[var(--color-saffron)] bg-[var(--color-saffron)]/10",
+  default:   "border-[var(--color-line)] text-[var(--color-text)] bg-[var(--color-canvas)]",
+  forge:     "border-[var(--color-line)] text-[var(--color-text)] bg-[var(--color-forge)]",
+  emerald:   "border-[var(--color-line)] text-[var(--color-text)] bg-[#c9f2d8]",
+  rust:      "border-[var(--color-line)] text-[var(--color-text)] bg-[var(--color-rust)]",
+  saffron:   "border-[var(--color-line)] text-[var(--color-text)] bg-[var(--color-saffron)]",
   muted:     "border-[var(--color-line)] text-[var(--color-muted)] bg-transparent",
 } as const;
 
@@ -20,7 +20,7 @@ export function Pill({
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-[11.5px] ${TONES[tone]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded border-2 px-2.5 py-[3px] text-[11.5px] font-bold ${TONES[tone]} ${className}`}
     >
       {children}
     </span>
