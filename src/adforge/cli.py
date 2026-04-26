@@ -145,13 +145,15 @@ def run_creative(
     network: str = typer.Option("TikTok", "--network"),
     period: str = typer.Option("month", "--period"),
     sample: int = typer.Option(30, "--sample"),
-    render_http: bool = typer.Option(False, "--render-http", help="Render via Scenario HTTP API (else use the MCP)"),
 ) -> None:
-    """project → market insights → storyboard → video ad creative."""
+    """project → market intel → Claude-labeled patterns → Scenario Seedance video."""
     from adforge.pipelines.creative_forge import CreativeForgeInput
 
     p = _resolve_project(project)
     cfg_id = _resolve_config("creative_forge", config)
+    cfg = find_config("creative_forge", cfg_id)
+    params = (cfg.params if cfg else {}) or {}
+
     rid = make_run_id("creative", p.id)
     run_dir = str(ensure_run_dir(rid))
 
@@ -160,10 +162,33 @@ def run_creative(
         target_term=p.name,
         category=category or p.category_id,
         country=country or p.country,
-        network=network, period=period,
-        sample=sample, render_with_scenario_http=render_http,
+        network=network, period=period, sample=sample,
+        seedance_model_id=str(params.get("seedance_model_id", "model_bytedance-seedance-2-0")),
+        num_videos=int(params.get("num_videos", 1)),
+        video_duration_s=int(params.get("video_duration_s", 6)),
     )
     asyncio.run(_start_workflow("creative_forge", inp, workflow_id=rid))
+
+
+@run.command("intel")
+def run_intel(
+    project: str = typer.Option(..., "--project", help="Project id (folder under projects/)"),
+    config:  str = typer.Option("default", "--config", help="PipelineConfig preset id"),
+) -> None:
+    """project → keyframes → Claude vision genre → SensorTower → analysis → slide deck."""
+    from adforge.pipelines.market_intel import MarketIntelInput
+
+    p = _resolve_project(project)
+    cfg_id = _resolve_config("market_intel", config)
+
+    rid = make_run_id("intel", p.id)
+    run_dir = str(ensure_run_dir(rid))
+
+    inp = MarketIntelInput(
+        project_id=p.id, run_id=rid, run_dir=run_dir, config_id=cfg_id,
+        video_path=p.video_path,
+    )
+    asyncio.run(_start_workflow("market_intel", inp, workflow_id=rid))
 
 
 # ───── tools (no Temporal required) ──────────────────────────────────────

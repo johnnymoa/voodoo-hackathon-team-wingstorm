@@ -9,7 +9,7 @@ the manifest at the end with the real status + artifacts.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -24,14 +24,42 @@ class StartRunError(Exception):
     """Raised when a run can't be started (bad pipeline/config/project)."""
 
 
+# Variants need to be DRAMATICALLY different — when easy is just a 33% speed
+# nudge from default, no human can tell them apart at-a-glance, which is
+# exactly the "all variations look the same" feedback. Each variant here
+# changes one knob to an extreme, so they read as obviously different runs.
 _DEFAULT_PLAYABLE_VARIANTS = [
-    VariationSpec(name="easy",     overrides={"enemySpeed": 60,  "winScore": 8,  "spawnEverySeconds": 1.6}),
-    VariationSpec(name="hard",     overrides={"enemySpeed": 140, "winScore": 18, "spawnEverySeconds": 0.7}),
-    VariationSpec(name="speedrun", overrides={"sessionSeconds": 15}),
-    VariationSpec(name="neon",     overrides={"palette": ["#0b0b1a", "#ff2bd6", "#22e1ff", "#fff700", "#ff7849"]}),
+    # Beginner mode: very slow enemies, small win threshold, lots of breathing room
+    VariationSpec(
+        name="easy",
+        overrides={"enemySpeed": 35, "winScore": 5, "spawnEverySeconds": 2.5,
+                   "sessionSeconds": 45, "ctaText": "Play Now"},
+    ),
+    # Hardcore mode: blazing enemies, high score gate, aggressive spawn
+    VariationSpec(
+        name="hard",
+        overrides={"enemySpeed": 220, "winScore": 30, "spawnEverySeconds": 0.4,
+                   "sessionSeconds": 30, "ctaText": "Beat the level"},
+    ),
+    # Speedrun: 12-second clock — cuts the demo to a hyper-short urgency loop
+    VariationSpec(
+        name="speedrun",
+        overrides={"sessionSeconds": 12, "winScore": 6, "spawnEverySeconds": 0.6,
+                   "ctaText": "Can you do it?"},
+    ),
+    # Neon palette: dramatic palette swap so the visual differs at-a-thumbnail
+    VariationSpec(
+        name="neon",
+        overrides={"palette": ["#0b0b1a", "#ff2bd6", "#22e1ff", "#fff700", "#ff7849"],
+                   "enemySpeed": 110, "ctaText": "Free — Tap to play"},
+    ),
 ]
 
-_PIPELINE_SHORT = {"creative_forge": "creative", "playable_forge": "playable"}
+_PIPELINE_SHORT = {
+    "creative_forge": "creative",
+    "playable_forge": "playable",
+    "market_intel": "intel",
+}
 
 
 def _build_workflow_input(
@@ -47,6 +75,7 @@ def _build_workflow_input(
             raise StartRunError(f"project '{project.id}' has no video.mp4 — playable_forge needs one.")
         return PlayableForgeInput(
             project_id=project.id, run_id=run_id, run_dir=run_dir, config_id=config_id,
+            project_dir=project.project_dir,    # for GDD-based intel
             video_path=project.video_path,
             asset_dir=project.asset_dir,
             variants=_DEFAULT_PLAYABLE_VARIANTS,
@@ -57,12 +86,21 @@ def _build_workflow_input(
         params = (cfg.params if cfg else {}) or {}
         return CreativeForgeInput(
             project_id=project.id, run_id=run_id, run_dir=run_dir, config_id=config_id,
-            target_term=project.name,
+            project_dir=project.project_dir,           # for GDD reading → genre detection
+            target_term=project.name,                  # initial guess, GDD title overrides if present
             category=project.category_id, country=project.country,
-            render_with_scenario_http=bool(params.get("render_with_scenario_http", False)),
-            render_mode=str(params.get("render_mode", "image")),
-            num_images=int(params.get("num_images", 3)),
-            video_duration_s=int(params.get("video_duration_s", 5)),
+            seedance_model_id=str(params.get("seedance_model_id", "model_bytedance-seedance-2-0")),
+            num_videos=int(params.get("num_videos", 1)),
+            video_duration_s=int(params.get("video_duration_s", 6)),
+            video_path=project.video_path,             # optional → analyze with Gemini
+            asset_dir=project.asset_dir,               # optional → list & reference in brief
+            genre=project.genre,                       # for SensorTower category matching
+        )
+    if pipeline_id == "market_intel":
+        from adforge.pipelines.market_intel import MarketIntelInput
+        return MarketIntelInput(
+            project_id=project.id, run_id=run_id, run_dir=run_dir, config_id=config_id,
+            video_path=project.video_path,
         )
     raise StartRunError(f"unknown pipeline '{pipeline_id}'")
 
@@ -120,8 +158,14 @@ async def start_run(pipeline_id: str, project_id: str, config_id: str = "default
         namespace=s.temporal_namespace,
         data_converter=pydantic_data_converter,
     )
+    # task_timeout=60s defeats the workflow-task-timeout cascade we kept
+    # hitting under any concurrent load: the Python sandbox + first-task
+    # processing is slower than Temporal's default 10s, so the workflow task
+    # would time out → reschedule → time out again, leaving HistoryLength=4
+    # forever and the run dir empty. 60s is plenty of headroom.
     await client.start_workflow(
         pipeline_id, inp, id=run_id, task_queue=s.temporal_task_queue,
+        task_timeout=timedelta(seconds=60),
     )
 
     return {

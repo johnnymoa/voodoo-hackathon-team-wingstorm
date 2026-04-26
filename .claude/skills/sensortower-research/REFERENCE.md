@@ -293,7 +293,130 @@ GET /v1/unified/ad_intel/creatives
   &display_breakdown=true&limit=100&auth_token=XXX
 ```
 
-## 12. Troubleshooting
+## 12. Network Analysis (SOV Time Series)
+
+`GET /v1/{os}/ad_intel/network_analysis`
+
+Share of Voice impressions time series for specific apps. Shows how an app's
+ad visibility changes over time across networks and countries.
+
+| Param | Required | Type | Notes |
+|---|---|---|---|
+| `os` | yes | path | `ios`, `android`, `unified` |
+| `app_ids` | yes | array[string] | Comma-separated unified/os-specific IDs |
+| `start_date` | yes | string | `YYYY-MM-DD`, min 2018-01-01 |
+| `end_date` | yes | string | `YYYY-MM-DD` |
+| `period` | yes | string | `day`, `week`, `month` |
+| `networks` | no | array[string] | Filter to specific networks |
+| `countries` | no | array[string] | Filter to specific countries |
+
+Response: array of `{app_id, country, network, date, sov}` objects.
+
+```json
+[
+  {"app_id": "55d3a1a8...", "country": "US", "network": "Applovin", "date": "2023-01-01", "sov": 0.04},
+  {"app_id": "55d3a1a8...", "country": "US", "network": "Youtube",  "date": "2023-01-01", "sov": 0.01}
+]
+```
+
+### Example: Track a competitor's ad spend ramp
+
+```
+GET /v1/unified/ad_intel/network_analysis
+  ?app_ids=5f16a8019f7b275235017614
+  &start_date=2026-01-01&end_date=2026-04-01
+  &period=week&countries=US
+  &auth_token=XXX
+```
+
+## 13. Network Analysis Rank
+
+`GET /v1/{os}/ad_intel/network_analysis/rank`
+
+Daily/weekly advertising rank of apps by network and country.
+
+| Param | Required | Type | Notes |
+|---|---|---|---|
+| `os` | yes | path | `ios`, `android`, `unified` |
+| `app_ids` | yes | array[string] | Comma-separated |
+| `start_date` | yes | string | `YYYY-MM-DD`, min 2018-01-01 |
+| `end_date` | yes | string | `YYYY-MM-DD` |
+| `period` | yes | string | `day`, `week` (no `month`) |
+| `networks` | no | array[string] | |
+| `countries` | no | array[string] | |
+
+Response: array of `{app_id, country, network, date, rank}`.
+
+```json
+[
+  {"app_id": "55d3a1a8...", "country": "US", "network": "Facebook", "date": "2023-05-08", "rank": 3},
+  {"app_id": "55d3a1a8...", "country": "US", "network": "Admob",    "date": "2023-05-08", "rank": 127}
+]
+```
+
+## 14. Download Channels
+
+`GET /v1/{os}/downloads_by_sources`
+
+Breaks down an app's downloads by acquisition source: organic browse,
+organic search, paid ads, paid search, and browser.
+
+**Important**: Always requires **unified** `app_ids` regardless of `os` param.
+The `os` param only filters which platform's data is included.
+
+| Param | Required | Type | Notes |
+|---|---|---|---|
+| `os` | yes | path | `ios`, `android`, `unified` |
+| `app_ids` | yes | array[string] | **Unified IDs only** |
+| `countries` | yes | array[string] | Use `WW` for worldwide |
+| `start_date` | yes | string | `YYYY-MM-DD` |
+| `end_date` | yes | string | `YYYY-MM-DD` |
+| `date_granularity` | no | string | `daily` or `monthly` (default) |
+
+Response fields per breakdown entry:
+
+| Field | Description |
+|---|---|
+| `organic_browse_abs` / `_frac` | Featured / category browsing installs |
+| `organic_search_abs` / `_frac` | Store search installs |
+| `paid_abs` / `_frac` | Paid ad-driven installs |
+| `paid_search_abs` / `_frac` | Paid search (Apple Search Ads, etc.) |
+| `browser_abs` / `_frac` | Browser-referral installs |
+| `organic_abs` / `_frac` | Legacy: sum of browse + search |
+
+### Example: Paid vs organic split for a competitor
+
+```
+GET /v1/unified/downloads_by_sources
+  ?app_ids=55c5027502ac64f9c0001fa6
+  &countries=US&start_date=2026-01-01&end_date=2026-03-31
+  &date_granularity=monthly&auth_token=XXX
+```
+
+## 15. Install Base & Penetration (Facets)
+
+`GET /v1/facets/metrics` with query type `install_base`
+
+Estimates current install base and market penetration. Uses the facets
+endpoint pattern (different from ad_intel endpoints).
+
+Required params: `breakdown`, `date_granularity`, `start_date`, `end_date`,
+exactly one `metric`, and exactly one entity filter (`app_ids` or
+`category` + `country`).
+
+## 16. SDK Analysis (Facets)
+
+`GET /v1/facets/metrics` with query type `sdk_analysis`
+
+Shows which SDKs an app uses (analytics, monetization, attribution, etc.).
+Useful for understanding a competitor's tech stack.
+
+`GET /v1/facets/metrics` with query type `sdk_list_of_apps` returns apps
+using a specific SDK.
+
+`GET /v1/sdk/summary_metrics` provides SDK-level aggregate metrics.
+
+## 17. Troubleshooting
 
 If `creatives/top` returns 422:
 - `network` must be a single valid network (not `All Networks`).

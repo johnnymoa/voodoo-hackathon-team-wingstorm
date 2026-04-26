@@ -36,11 +36,20 @@ def complete(
         if cache_system:
             sys_blocks[0]["cache_control"] = {"type": "ephemeral"}
 
-    resp = _client().messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        system=sys_blocks if sys_blocks else None,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    # Opus 4.7 (and other reasoning-style Claudes) deprecate the `temperature`
+    # knob — passing it returns a 400 InvalidRequest. Detect by model id and
+    # skip the param entirely. This single bug was masking the entire
+    # playable_build → Claude path: every Opus call 400'd, the activity caught
+    # the exception, and silently fell back to the deterministic baseline
+    # template (the "1-second playable" symptom).
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "system": sys_blocks if sys_blocks else None,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if "opus" not in model.lower():
+        kwargs["temperature"] = temperature
+
+    resp = _client().messages.create(**kwargs)
     return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")

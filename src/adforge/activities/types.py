@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ───── playable_forge ──────────────────────────────────────────────────────────
@@ -31,6 +31,7 @@ class PlayableBuildInput(BaseModel):
     asset_dir: str | None = None
     market_patterns: dict[str, Any] | None = None   # optional: from creative_forge
     out_path: str
+    config_id: str = "default"
 
 
 class PlayableBuildResult(BaseModel):
@@ -59,12 +60,14 @@ class VariationsResult(BaseModel):
 
 class TargetGameInput(BaseModel):
     term: str                            # e.g. "castle clasher"
+    genre: str | None = None             # from project.json or GDD — used to derive SensorTower category
 
 
 class TargetGame(BaseModel):
     app_id: str
     name: str
     publisher_name: str | None = None
+    category_id: str | None = None      # extracted from SensorTower's matched app, NOT project.json
     raw: dict[str, Any]
 
 
@@ -84,6 +87,8 @@ class MarketData(BaseModel):
 class PatternExtractionInput(BaseModel):
     creatives: dict[str, Any]
     sample: int = 30
+    config_id: str = "default"
+    top_advertisers: dict[str, Any] = Field(default_factory=dict)
 
 
 class Patterns(BaseModel):
@@ -96,6 +101,10 @@ class BriefInput(BaseModel):
     target: TargetGame
     patterns: Patterns
     out_dir: str
+    # Optional: Gemini's GameAnalysis dict if a gameplay video was analyzed.
+    gameplay_analysis: dict[str, Any] = Field(default_factory=dict)
+    # Optional: list of available asset filenames in the project's assets/ dir.
+    assets: list[str] = Field(default_factory=list)
 
 
 class BriefResult(BaseModel):
@@ -111,6 +120,14 @@ class ScenarioRenderInput(BaseModel):
     height: int = 1820
     mode: str = "image"          # "image" | "video"
     video_duration_s: int = 5
+    config_id: str = "default"
+    model_id: str | None = None  # for Scenario Seedance: e.g. "model_bytedance-seedance-2-0"
+    # Optional: when present, render_seedance switches to image-to-video mode
+    # — the seed image grounds the output in the actual game's pixels instead
+    # of leaving it to Seedance to hallucinate from text alone. Used by the
+    # grounded-i2v config to fix the "video disconnected from the game" class
+    # of feedback.
+    seed_image_path: str | None = None
 
 
 class ScenarioRenderResult(BaseModel):

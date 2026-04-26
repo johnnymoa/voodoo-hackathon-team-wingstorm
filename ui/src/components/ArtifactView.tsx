@@ -4,15 +4,18 @@ import { api, type Artifact } from "../lib/api";
 
 const TEXT_KINDS = new Set(["md", "txt", "json", "yaml", "yml", "csv"]);
 const IMAGE_KINDS = new Set(["png", "jpg", "jpeg", "webp", "gif", "svg"]);
+const VIDEO_KINDS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 
 export function ArtifactView({
   runId, artifact,
 }: { runId: string; artifact: Artifact }) {
-  if (artifact.kind === "html") return <HtmlPlayable runId={runId} artifact={artifact} />;
-  if (IMAGE_KINDS.has(artifact.kind)) return <ImagePane runId={runId} artifact={artifact} />;
-  if (artifact.kind === "md") return <MarkdownPane runId={runId} artifact={artifact} />;
-  if (artifact.kind === "json") return <JsonPane runId={runId} artifact={artifact} />;
-  if (TEXT_KINDS.has(artifact.kind)) return <TextPane runId={runId} artifact={artifact} />;
+  const kind = artifact.kind.toLowerCase();
+  if (kind === "html") return <HtmlPlayable runId={runId} artifact={artifact} />;
+  if (IMAGE_KINDS.has(kind)) return <ImagePane runId={runId} artifact={artifact} />;
+  if (VIDEO_KINDS.has(kind)) return <VideoPane runId={runId} artifact={artifact} />;
+  if (kind === "md") return <MarkdownPane runId={runId} artifact={artifact} />;
+  if (kind === "json") return <JsonPane runId={runId} artifact={artifact} />;
+  if (TEXT_KINDS.has(kind)) return <TextPane runId={runId} artifact={artifact} />;
   return <BinaryPane runId={runId} artifact={artifact} />;
 }
 
@@ -50,6 +53,23 @@ function ImagePane({ runId, artifact }: { runId: string; artifact: Artifact }) {
   );
 }
 
+function VideoPane({ runId, artifact }: { runId: string; artifact: Artifact }) {
+  const src = api.artifactUrl(runId, artifact.name);
+  return (
+    <Frame label={`video · ${artifact.kind}`} actions={<OpenInTab href={src} />}>
+      <div className="flex items-center justify-center bg-[var(--color-canvas)] p-6">
+        <video
+          src={src}
+          controls
+          playsInline
+          preload="metadata"
+          className="max-h-[70vh] max-w-full border border-[var(--color-line-2)] bg-black"
+        />
+      </div>
+    </Frame>
+  );
+}
+
 function MarkdownPane({ runId, artifact }: { runId: string; artifact: Artifact }) {
   const text = useText(runId, artifact);
   if (text.kind === "loading") return <PaneLoading label="markdown" />;
@@ -57,11 +77,13 @@ function MarkdownPane({ runId, artifact }: { runId: string; artifact: Artifact }
   const html = marked.parse(text.value, { async: false }) as string;
   return (
     <Frame label="markdown" actions={<OpenInTab href={api.artifactUrl(runId, artifact.name)} />}>
-      <article
-        className="prose-studio p-8 max-w-[78ch] mx-auto"
-        // marked output is from local files we wrote ourselves; OK to dangerouslySetInnerHTML in this internal tool
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <div className="max-h-[70vh] overflow-auto">
+        <article
+          className="prose-studio p-8 max-w-[78ch] mx-auto"
+          // marked output is from local files we wrote ourselves; OK to dangerouslySetInnerHTML in this internal tool
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </div>
     </Frame>
   );
 }
@@ -76,7 +98,7 @@ function JsonPane({ runId, artifact }: { runId: string; artifact: Artifact }) {
   } catch { /* leave as-is */ }
   return (
     <Frame label="json" actions={<OpenInTab href={api.artifactUrl(runId, artifact.name)} />}>
-      <pre className="overflow-auto p-6 text-[13px] leading-relaxed text-[var(--color-text-2)]">{pretty}</pre>
+      <pre className="max-h-[70vh] overflow-auto p-6 text-[13px] leading-relaxed text-[var(--color-text-2)]">{pretty}</pre>
     </Frame>
   );
 }
@@ -87,7 +109,7 @@ function TextPane({ runId, artifact }: { runId: string; artifact: Artifact }) {
   if (text.kind === "error") return <PaneError label={artifact.kind} message={text.error} />;
   return (
     <Frame label={artifact.kind} actions={<OpenInTab href={api.artifactUrl(runId, artifact.name)} />}>
-      <pre className="whitespace-pre-wrap break-words p-6 text-[13px] leading-relaxed text-[var(--color-text-2)]">{text.value}</pre>
+      <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-words p-6 text-[13px] leading-relaxed text-[var(--color-text-2)]">{text.value}</pre>
     </Frame>
   );
 }

@@ -4,9 +4,18 @@ A **pipeline** is a recipe that turns a project (input material) into a run
 (folder of artefacts). The PIPELINES registry below is the single source of
 truth — the CLI, the API, and the UI all read from it.
 
-Adding a new pipeline = one PipelineSpec entry + the workflow class. Iterating
-on an existing one = a new PipelineConfig preset and a branch in the relevant
-activity on `inp.config_id`. That's the whole forge.
+Two pipelines ship today:
+
+  - **creative_forge**  →  Video Ad. Project → Sensor Tower market intel →
+                           Claude Haiku labeled patterns → Scenario Seedance
+                           2.0 video clip (9:16 / 720p / audio).
+  - **playable_forge**  →  Playable HTML. Project's gameplay video → Gemini
+                           analysis → Claude Sonnet authors a tailored loop
+                           body → variants.
+
+Iterating a pipeline = ship a new code revision in-place (the workflow file
++ activity files own the implementation). `PipelineConfig` presets are for
+small knob tweaks within the same code path (model id, sample size, duration).
 """
 
 from __future__ import annotations
@@ -16,15 +25,12 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from adforge.pipelines.creative_forge import CreativeForge, CreativeForgeInput
+from adforge.pipelines.market_intel import MarketIntel, MarketIntelInput
 from adforge.pipelines.playable_forge import PlayableForge, PlayableForgeInput
 
 
 class PipelineConfig(BaseModel):
-    """A named preset of pipeline knobs. Same workflow, different behavior.
-
-    `params` is a dict of overrides merged into the workflow input — model
-    choice, prompt template, sample size, anything pipeline-specific.
-    """
+    """A named preset of pipeline knobs. Same workflow, different parameters."""
     id: str
     name: str
     description: str
@@ -32,63 +38,142 @@ class PipelineConfig(BaseModel):
 
 
 class PipelineInput(BaseModel):
-    """One input the pipeline expects to find in a project folder.
-
-    Used by the UI (to show what a pipeline needs) and by the auto-ingest
-    activity (to map random files in projects/<id>/ into the right slot).
-    """
     id: str                 # "video", "assets", "metadata"
     kind: str               # "file" | "dir" | "metadata"
-    description: str        # human-readable
+    description: str
     required: bool = True
 
 
 class PipelineSpec(BaseModel):
-    id: str                              # workflow name + CLI subcommand
-    name: str                            # display name
-    description: str                     # one-sentence "what it does"
-    inputs: list[PipelineInput] = []     # what the pipeline consumes from a project
-    outputs: list[str] = []              # canonical artifact filenames
-    cli: str = ""                        # canonical CLI invocation (with <id> placeholder)
-    configs: list[PipelineConfig] = []   # named presets
+    id: str
+    name: str
+    description: str
+    output_kind: str = "asset"           # "video" | "playable" | "asset" — for UI grouping
+    inputs: list[PipelineInput] = []
+    outputs: list[str] = []
+    cli: str = ""
+    configs: list[PipelineConfig] = []
 
 
 PIPELINES: list[PipelineSpec] = [
     PipelineSpec(
         id="creative_forge",
         name="Video Ad",
-        description="Project → web research + market insights → storyboard → AI-generated video ad creative.",
+        description=(
+            "Sensor Tower market intel → Claude Haiku labels working creatives "
+            "(top advertisers × longevity) → optional Gemini analysis of the "
+            "project's gameplay video grounds the brief in the actual game → "
+            "Scenario Seedance 2.0 renders a 9:16 / 720p / audio-on video clip."
+        ),
+        output_kind="video",
         inputs=[
-            PipelineInput(id="metadata", kind="metadata", description="Game name, genre, category — read from project.json."),
+            PipelineInput(id="metadata", kind="metadata",
+                description="Game name, genre, category — read from project.json."),
+            PipelineInput(id="video", kind="file",
+                description="Optional. Gameplay video.mp4 — when present, Gemini analyzes it and the brief grounds the concept in the actual game (mechanic, palette, juice, audio cues).",
+                required=False),
+            PipelineInput(id="assets", kind="dir",
+                description="Optional. assets/ folder — listed in the brief by filename and referenced in the Scenario prompt.",
+                required=False),
         ],
-        outputs=["brief.md", "scenario_prompt.txt", "patterns.json", "top_creatives.json", "top_advertisers.json"],
+        outputs=["brief.md", "scenario_prompt.txt", "patterns.json", "top_creatives.json", "top_advertisers.json", "gameplay_analysis.json", "creative_*.mp4"],
         cli="adforge run creative --project <id>",
         configs=[
             PipelineConfig(
                 id="default",
-                name="Default",
-                description="Mistral for labeling, Gemini for analysis, Scenario MCP for the static creative.",
+                name="Seedance 2.0",
+                description="Best quality. 6s, 9:16, 720p, native audio.",
+                params={
+                    "seedance_model_id": "model_bytedance-seedance-2-0",
+                    "video_duration_s": 6,
+                    "num_videos": 1,
+                },
             ),
             PipelineConfig(
-                id="render-images",
-                name="With Scenario images [BLOCKED]",
-                description="Calls Scenario txt2img after the brief. BLOCKED on this account: requires a `modelId` and the account has zero models registered (GET /v1/models returns []). Use the Scenario MCP via `scenario-generate` until models are configured in the Scenario dashboard.",
-                params={"render_with_scenario_http": True, "render_mode": "image", "num_images": 3},
+                id="fast",
+                name="Seedance 2.0 Fast",
+                description="Cheaper iteration tier — same I/O, faster + lower cost. Good for sweeping prompt variants.",
+                params={
+                    "seedance_model_id": "model_bytedance-seedance-2-0-fast",
+                    "video_duration_s": 6,
+                    "num_videos": 1,
+                },
             ),
             PipelineConfig(
-                id="render-video",
-                name="With Veo video",
-                description="Pipeline goes all the way — after the brief, calls Veo 3 (Gemini API) text-to-video to render a 9:16 vertical clip into runs/<id>/. The brief's Scenario prompt becomes an actual moving asset. Costs ~$0.40–2.00 per clip; keep num_videos at 1 while iterating.",
-                params={"render_with_scenario_http": True, "render_mode": "video", "num_images": 1, "video_duration_s": 8},
+                id="grounded",
+                name="Grounded (game-specific prompt, 10s)",
+                description=(
+                    "Hypothesis: the disconnected-from-the-game complaint comes from "
+                    "the prompt leading with meta-instructions (9:16, max-6-words) "
+                    "and ending with weak generic style notes. Instead, lead with a "
+                    "specific 'visual signature' built from Gemini's gameplay "
+                    "analysis (exact scene, art style, palette in hex, named juice "
+                    "cues), drop the literal game name (Seedance can't render text "
+                    "reliably and we just got 'Spelletaire' instead of 'Spellitaire'), "
+                    "and bump duration to 10s for proper TikTok-ad pacing."
+                ),
+                params={
+                    "seedance_model_id": "model_bytedance-seedance-2-0-fast",
+                    "video_duration_s": 10,
+                    "num_videos": 1,
+                    "prompt_style": "grounded",
+                },
+            ),
+            PipelineConfig(
+                id="grounded-i2v-v2",
+                name="Grounded i2v v2 (genre-filtered + dynamic hooks)",
+                description=(
+                    "Hypothesis: the v1 i2v config still produces wrong-genre market "
+                    "intel (Mini Slayer got anime horse-racing ads, Spellitaire got "
+                    "language tutoring apps). v2 uses genre-aware SensorTower category "
+                    "mapping so market patterns are from the right genre. Also: hook "
+                    "blueprints are now game-specific (no more 'wrecked castle' for "
+                    "every game), audio files filtered from visual props list, and "
+                    "palette contradictions resolved."
+                ),
+                params={
+                    "seedance_model_id": "model_bytedance-seedance-2-0",
+                    "video_duration_s": 10,
+                    "num_videos": 1,
+                    "prompt_style": "grounded",
+                },
+            ),
+            PipelineConfig(
+                id="grounded-i2v",
+                name="Grounded i2v (seed from game footage)",
+                description=(
+                    "Hypothesis: 11 of 13 open feedback items are 'the video is "
+                    "disconnected from the game' — text prompts can't hold a "
+                    "specific game's identity (Seedance hallucinated a dragon for "
+                    "Mini Slayer, misspelled SPELLITAIRE, drew no match-3 grid). "
+                    "Fix at INPUT time, not in prose: extract the gameplay "
+                    "video's first frame and pass it to Seedance as the i2v seed "
+                    "image. The animation then starts from real game pixels — "
+                    "character, palette, UI all pinned to ground truth. The text "
+                    "prompt becomes a beat-map / motion direction layered on top "
+                    "instead of carrying the visual identity alone. 10s duration "
+                    "for TikTok pacing."
+                ),
+                params={
+                    "seedance_model_id": "model_bytedance-seedance-2-0",
+                    "video_duration_s": 10,
+                    "num_videos": 1,
+                    "prompt_style": "grounded",
+                },
             ),
         ],
     ),
     PipelineSpec(
         id="playable_forge",
         name="Playable",
-        description="Gameplay video + asset kit → single-file HTML playable + parameter variants.",
+        description=(
+            "Gemini analyzes the gameplay video → Claude Sonnet authors a "
+            "tailored loop body for the analyzed mechanic → assets are inlined "
+            "→ parameter variants are emitted."
+        ),
+        output_kind="playable",
         inputs=[
-            PipelineInput(id="video",  kind="file", description="Gameplay capture (mp4/mov). The pipeline analyzes this with Gemini."),
+            PipelineInput(id="video",  kind="file", description="Gameplay capture (mp4/mov)."),
             PipelineInput(id="assets", kind="dir",  description="Optional folder of images / audio to inline.", required=False),
         ],
         outputs=["playable.html", "playable__*.html"],
@@ -96,15 +181,122 @@ PIPELINES: list[PipelineSpec] = [
         configs=[
             PipelineConfig(
                 id="default",
+                name="Claude Sonnet",
+                description="Sonnet authors the loop body. Validation-gated; falls back to baseline build on failure.",
+            ),
+            PipelineConfig(
+                id="claude-opus-v2",
+                name="Claude Opus v2 + real asset inlining",
+                description=(
+                    "Hypothesis: v1 opus config generates Image() calls with relative "
+                    "paths but inline_html_assets only processes HTML tags, not JS. "
+                    "v2 fixes: (1) JS-level asset inlining rewrites img.src and "
+                    "new Audio() to base64 data URLs, (2) resolves paths from project "
+                    "assets/ not run dir, (3) title tag uses actual game name. "
+                    "Should produce self-contained playables with real game art."
+                ),
+                params={"playable_model": "opus", "asset_aware": True, "relax_validation": True},
+            ),
+            PipelineConfig(
+                id="claude-opus",
+                name="Claude Opus + asset-aware",
+                description=(
+                    "Hypothesis: black/empty playables come from (a) the validation gate "
+                    "rejecting Claude's output for missing `</script>` and silently falling "
+                    "back to the asset-blind baseline tap-target, and (b) when Claude does "
+                    "ship code, it doesn't know what visual assets exist so it renders "
+                    "geometry on a canvas matching the bg colour (mini_slayer palette[0]=#000 "
+                    "→ black-on-black). Fix: switch to Claude Opus 4.7, inline the project's "
+                    "asset filenames + a short description of each into the prompt so Claude "
+                    "explicitly draws sprites at known positions, and auto-wrap missing "
+                    "<script> tags instead of falling back."
+                ),
+                params={"playable_model": "opus", "asset_aware": True, "relax_validation": True},
+            ),
+        ],
+    ),
+    PipelineSpec(
+        id="market_intel",
+        name="Market Intelligence",
+        description=(
+            "Project (video + assets + GDD) → competitive analysis vs SensorTower "
+            "→ positioning, storyboards, slide deck. Uses Claude (vision + text); "
+            "no Gemini/Veo."
+        ),
+        output_kind="asset",
+        inputs=[
+            PipelineInput(id="metadata", kind="metadata",
+                description="Game name + description — read from project.json."),
+            PipelineInput(id="video", kind="file",
+                description="Optional gameplay video; frames extracted locally with imageio.",
+                required=False),
+            PipelineInput(id="assets", kind="dir",
+                description="Optional folder of art/audio.", required=False),
+        ],
+        outputs=["deck.html", "genre.json", "analysis.json", "top_advertisers.json",
+                 "top_creatives.json", "frames/*.png"],
+        cli="adforge run intel --project <id>",
+        configs=[
+            PipelineConfig(
+                id="default",
                 name="Default",
-                description="Gemini video analysis → CONFIG-block injection into template → 4 baseline variants.",
+                description=(
+                    "Local frame extraction (imageio) → Claude vision genre inference "
+                    "→ SensorTower → Claude analysis + storyboards → HTML slide deck. "
+                    "No Gemini."
+                ),
+            ),
+            PipelineConfig(
+                id="intel-presentation-v2",
+                name="Executive Deck (v2)",
+                description=(
+                    "Hypothesis: an executive 16:9 deck themed to the project's own "
+                    "palette, with genre-targeted SensorTower competitors and visual "
+                    "storyboard frames, will be far more useful than a text-heavy report."
+                ),
+            ),
+            PipelineConfig(
+                id="intel-presentation-v3",
+                name="Executive Deck (v3)",
+                description=(
+                    "Hypothesis: short copy must be Claude-generated, not truncated; "
+                    "storyboards need full beats with playbook-grounded SVG sketches; "
+                    "competitors need real data points (rating count, release date)."
+                ),
+            ),
+            PipelineConfig(
+                id="intel-presentation-v5",
+                name="Executive Deck (v5)",
+                description=(
+                    "Hypothesis: v5 widens the genre-search net, computes a Scale tier "
+                    "(Mega Hit / Hit / Solid / Niche) from rating count, and attaches "
+                    "Share-of-Voice from top_advertisers for spend context."
+                ),
+            ),
+            PipelineConfig(
+                id="intel-presentation-v6",
+                name="Executive Deck (v6)",
+                description=(
+                    "Hypothesis: the deck becomes more useful when slide 3 filters out "
+                    "Long Tail apps and studies Solid+ genre competitors through an "
+                    "advertising lens."
+                ),
+            ),
+            PipelineConfig(
+                id="intel-presentation-v7",
+                name="Executive Deck (v7)",
+                description=(
+                    "Hypothesis: the deck reads smarter when challenges and opportunities "
+                    "are non-overlapping strategic tensions, competitor cards ranked by "
+                    "creative activity, and theme chooses a contrast-safe background."
+                ),
             ),
         ],
     ),
 ]
 
 
-WORKFLOWS = [PlayableForge, CreativeForge]
+WORKFLOWS = [PlayableForge, CreativeForge, MarketIntel]
 
 
 def find_pipeline(pipeline_id: str) -> PipelineSpec | None:

@@ -12,6 +12,8 @@ export interface RunSummary {
   completed_at: string | null;
   artifact_count: number;
   has_manifest: boolean;
+  has_feedback?: boolean;
+  feedback_status?: "open" | "fulfilled" | "wontfix" | null;
 }
 
 export interface Artifact {
@@ -70,6 +72,7 @@ export interface Pipeline {
   id: string;
   name: string;
   description: string;
+  output_kind: "video" | "playable" | "asset" | string;
   inputs: PipelineInput[];
   outputs: string[];
   cli: string;
@@ -121,6 +124,21 @@ async function jpost<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export interface FeedbackIndexRow {
+  run_id: string;
+  pipeline: string | null;
+  project_id: string | null;
+  config_id: string | null;
+  run_status: string | null;
+  started_at: string | null;
+  feedback_status: "open" | "fulfilled" | "wontfix" | string;
+  body: string;
+  created_at: string | null;
+  updated_at: string | null;
+  addressed_in_run: string | null;
+  addressed_by_config: string | null;
+}
+
 export const api = {
   health:        () => jget<{ status: string }>("/api/health"),
   pipelines:     () => jget<Pipeline[]>("/api/pipelines"),
@@ -143,4 +161,6 @@ export const api = {
   artifactUrl:   (run_id: string, rel: string) => `/artifacts/${encodeURIComponent(run_id)}/${rel}`,
   temporalUrl:   (run_id: string, namespace = "default") =>
     `http://localhost:8233/namespaces/${namespace}/workflows/${encodeURIComponent(run_id)}`,
+  feedbackIndex: (status: "open" | "fulfilled" | "wontfix" | "all" = "open") =>
+    jget<FeedbackIndexRow[]>(`/api/feedback?status=${status}`),
 };

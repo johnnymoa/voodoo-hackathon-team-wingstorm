@@ -73,7 +73,10 @@ class Settings(BaseModel):
 
 @lru_cache
 def settings() -> Settings:
-    load_dotenv(REPO_ROOT / ".env", override=False)
+    # override=True: the project's .env is the source of truth. Without this,
+    # an empty parent-shell `ANTHROPIC_API_KEY=` (e.g. from Claude Code's own
+    # env) shadows the real key and the worker silently fails Claude calls.
+    load_dotenv(REPO_ROOT / ".env", override=True)
     missing = [k for k in ("GEMINI_API_KEY", "SENSORTOWER_API_KEY") if not os.environ.get(k)]
     if missing:
         raise RuntimeError(f"Missing required env vars: {missing}. Edit .env at repo root.")
